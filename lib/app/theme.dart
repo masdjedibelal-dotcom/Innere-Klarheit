@@ -9,7 +9,6 @@ ThemeData buildAppTheme() {
   const onBg = Color(0xFF2B2420);
   const muted = Color(0xFF7A6F67);
   const outline = Color(0x1F2B2420);
-  const radiusLg = 24.0;
   const radiusMd = 16.0;
 
   final base = ThemeData(
@@ -103,14 +102,6 @@ ThemeData buildAppTheme() {
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
-    ),
-    cardTheme: CardTheme(
-      color: surface,
-      elevation: 0,
-      shadowColor: Colors.black.withOpacity(0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(radiusLg),
-      ),
     ),
     iconTheme: const IconThemeData(color: muted),
     switchTheme: SwitchThemeData(
