@@ -201,6 +201,7 @@
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
+				A1C9A1B4F2B9E1C2C4A7D001 /* Ensure MinimumOSVersion */,
 				73D6E5CC234A84990EC74206 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
@@ -273,6 +274,24 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		A1C9A1B4F2B9E1C2C4A7D001 /* Ensure MinimumOSVersion */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/App.framework/Info.plist",
+				"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}",
+			);
+			name = "Ensure MinimumOSVersion";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nMIN_IOS=\"${IPHONEOS_DEPLOYMENT_TARGET}\"\nAPP_FRAMEWORK_PLIST=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/App.framework/Info.plist\"\nRUNNER_PLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\nif [ -f \"${APP_FRAMEWORK_PLIST}\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :MinimumOSVersion ${MIN_IOS}\" \"${APP_FRAMEWORK_PLIST}\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :MinimumOSVersion string ${MIN_IOS}\" \"${APP_FRAMEWORK_PLIST}\"\nfi\nif [ -f \"${RUNNER_PLIST}\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :MinimumOSVersion ${MIN_IOS}\" \"${RUNNER_PLIST}\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :MinimumOSVersion string ${MIN_IOS}\" \"${RUNNER_PLIST}\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
 		2D8B5FC5798317D21786C134 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
