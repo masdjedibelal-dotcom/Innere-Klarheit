@@ -104,7 +104,7 @@ ThemeData buildAppTheme() {
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
     ),
-    cardTheme: CardThemeData(
+    cardTheme: CardTheme(
       color: surface,
       elevation: 0,
       shadowColor: Colors.black.withOpacity(0.08),
@@ -114,14 +114,14 @@ ThemeData buildAppTheme() {
     ),
     iconTheme: const IconThemeData(color: muted),
     switchTheme: SwitchThemeData(
-      trackColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
+      trackColor: MaterialStateProperty.resolveWith((states) {
+        if (states.contains(MaterialState.selected)) {
           return primary.withOpacity(0.35);
         }
         return outline.withOpacity(0.6);
       }),
-      thumbColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
+      thumbColor: MaterialStateProperty.resolveWith((states) {
+        if (states.contains(MaterialState.selected)) {
           return primary;
         }
         return muted;
