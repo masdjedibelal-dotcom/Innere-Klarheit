@@ -15,15 +15,15 @@ Future<void> showEditorialBottomSheet({
     builder: (_) => SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          bottom: 20 + MediaQuery.of(context).viewInsets.bottom,
-          top: 12,
-        ),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        bottom: 20 + MediaQuery.of(context).viewInsets.bottom,
+        top: 12,
+      ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          child: child,
+      child: child,
         ),
       ),
     ),
