@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../content/app_copy.dart';
 import '../../widgets/bottom_sheet/bottom_card_sheet.dart';
+import '../../widgets/bottom_sheet/method_catalog_sheet.dart';
 import '../../widgets/common/editorial_card.dart';
 import '../../widgets/common/tag_chip.dart';
+import '../../ui/components/screen_hero.dart';
 import '../../state/user_state.dart';
 import '../../data/models/method_v2.dart';
 import '../../data/models/system_block.dart';
@@ -34,20 +34,11 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
   Widget build(BuildContext context) {
     final blocksAsync = ref.watch(systemBlocksProvider);
     final methodsAsync = ref.watch(systemMethodsProvider);
-    final intro = copy('system.intro');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tag'),
-        actions: [
-          IconButton(
-            onPressed: () => context.push('/profil'),
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Profil',
-          ),
-        ],
-      ),
-      body: blocksAsync.when(
+      appBar: null,
+      body: SafeArea(
+        child: blocksAsync.when(
         data: (blocks) {
           return methodsAsync.when(
             data: (methods) {
@@ -68,11 +59,12 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
                   .toList();
 
               final headers = <Widget>[
-                if (intro.title.isNotEmpty)
-                  _IntroBlock(
-                    key: const ValueKey('intro'),
-                    copy: intro,
-                  ),
+                ScreenHero(
+                  key: const ValueKey('hero'),
+                  title: 'System',
+                  subtitle:
+                      'Baue deinen Tag in Blöcken. Wähle passende Methoden pro Block – einfach, konkret, wiederholbar.',
+                ),
                 _DateBar(
                   key: const ValueKey('datebar'),
                   date: _selectedDate,
@@ -82,7 +74,7 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
                 ),
                 Padding(
                   key: const ValueKey('block-actions'),
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  padding: const EdgeInsets.fromLTRB(30, 8, 30, 0),
                   child: Row(
                     children: [
                       Text('Tagesblöcke',
@@ -108,17 +100,14 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
                 children: [
                   ...headers,
                   for (var i = 0; i < activeBlocks.length; i++)
-                    ReorderableDragStartListener(
+                    _BlockSection(
                       key: ValueKey(activeBlocks[i].id),
-                      index: _headerCount + i,
-                      child: _BlockSection(
-                        block: activeBlocks[i],
-                        methods: methods
-                            .where(
-                                (m) => m.contexts.contains(activeBlocks[i].key))
-                            .toList(),
-                        isLast: i == activeBlocks.length - 1,
-                      ),
+                      reorderIndex: _headerCount + i,
+                      block: activeBlocks[i],
+                      methods: methods
+                          .where((m) => m.contexts.contains(activeBlocks[i].key))
+                          .toList(),
+                      isLast: i == activeBlocks.length - 1,
                     ),
                 ],
               );
@@ -132,6 +121,7 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(
           child: Text('Tag-Daten konnten nicht geladen werden.'),
+        ),
         ),
       ),
     );
@@ -196,44 +186,16 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
         onAdd: (id) {
           if (_activeBlockIds.contains(id)) return;
           setState(() => _activeBlockIds.add(id));
+          ref.read(userStateProvider.notifier).setDayPlanBlock(
+                DayPlanBlock(
+                  blockId: id,
+                  outcome: null,
+                  methodIds: const [],
+                  doneMethodIds: const [],
+                  done: false,
+                ),
+              );
         },
-      ),
-    );
-  }
-}
-
-class _IntroBlock extends StatelessWidget {
-  const _IntroBlock({super.key, required this.copy});
-  final AppCopyItem copy;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(copy.title, style: Theme.of(context).textTheme.titleLarge),
-          if (copy.subtitle.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              copy.subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurface.withOpacity(0.8),
-                  ),
-            ),
-          ],
-          if (copy.body.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              copy.body,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurface.withOpacity(0.75),
-                  ),
-            ),
-          ],
-        ],
       ),
     );
   }
@@ -256,7 +218,7 @@ class _DateBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      padding: const EdgeInsets.fromLTRB(30, 8, 30, 4),
       child: Row(
         children: [
           IconButton(
@@ -287,11 +249,14 @@ class _DateBar extends StatelessWidget {
 
 class _BlockSection extends ConsumerWidget {
   const _BlockSection({
+    super.key,
+    required this.reorderIndex,
     required this.block,
     required this.methods,
     required this.isLast,
   });
 
+  final int reorderIndex;
   final SystemBlock block;
   final List<MethodV2> methods;
   final bool isLast;
@@ -315,7 +280,7 @@ class _BlockSection extends ConsumerWidget {
         methods.where((m) => selectedIds.contains(m.id)).toList();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      padding: const EdgeInsets.fromLTRB(30, 12, 30, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -326,8 +291,27 @@ class _BlockSection extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(block.title,
-                      style: Theme.of(context).textTheme.titleLarge),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(block.title,
+                            style: Theme.of(context).textTheme.titleLarge),
+                      ),
+                      const SizedBox(width: 8),
+                      ReorderableDragStartListener(
+                        index: reorderIndex,
+                        child: Icon(
+                          Icons.drag_handle,
+                          size: 20,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.5),
+                        ),
+                      ),
+                    ],
+                  ),
                   if (block.desc.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
@@ -405,7 +389,7 @@ class _BlockSection extends ConsumerWidget {
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () =>
-                          _openMethodCatalog(context, ref, block, methods),
+                          _openMethodCatalog(context, block, methods),
                       child: const Text('Methoden hinzufügen'),
                     ),
                   ),
@@ -480,7 +464,7 @@ class _MethodRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(method.title,
-                      style: Theme.of(context).textTheme.titleMedium),
+                      style: Theme.of(context).textTheme.titleSmall),
                   if (method.shortDesc.isNotEmpty ||
                       method.category.isNotEmpty) ...[
                     const SizedBox(height: 6),
@@ -575,117 +559,16 @@ void _openMethodDetails(BuildContext context, MethodV2 m) {
 
 void _openMethodCatalog(
   BuildContext context,
-  WidgetRef ref,
   SystemBlock block,
   List<MethodV2> methods,
 ) {
   showBottomCardSheet(
     context: context,
-    child: _MethodCatalogSheet(
+    child: MethodCatalogSheet(
       block: block,
       methods: methods,
-      ref: ref,
     ),
   );
-}
-
-class _MethodCatalogSheet extends StatefulWidget {
-  const _MethodCatalogSheet({
-    required this.block,
-    required this.methods,
-    required this.ref,
-  });
-
-  final SystemBlock block;
-  final List<MethodV2> methods;
-  final WidgetRef ref;
-
-  @override
-  State<_MethodCatalogSheet> createState() => _MethodCatalogSheetState();
-}
-
-class _MethodCatalogSheetState extends State<_MethodCatalogSheet> {
-  String query = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final user = widget.ref.watch(userStateProvider);
-    final selectedIds = user.todayPlan[widget.block.id]?.methodIds ?? const [];
-    final filtered = widget.methods.where((m) {
-      if (!m.contexts.contains(widget.block.key)) return false;
-      if (query.trim().isEmpty) return true;
-      final q = query.toLowerCase();
-      return m.title.toLowerCase().contains(q) ||
-          m.shortDesc.toLowerCase().contains(q) ||
-          m.category.toLowerCase().contains(q);
-    }).toList();
-
-    return BottomCardSheet(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(widget.block.title,
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          TextField(
-            decoration: const InputDecoration(
-              hintText: 'Methoden filtern …',
-              border: OutlineInputBorder(),
-            ),
-            onChanged: (v) => setState(() => query = v),
-          ),
-          const SizedBox(height: 12),
-          if (filtered.isEmpty)
-            const Text('Keine Methoden gefunden.')
-          else
-            ...filtered.map((m) {
-              final selected = selectedIds.contains(m.id);
-              return Column(
-                children: [
-                  _MethodRow(
-                    method: m,
-                    showExamples: true,
-                    trailing: Icon(
-                      selected
-                          ? Icons.check_circle_outline
-                          : Icons.add_circle_outline,
-                    ),
-                    onTap: () {
-                      final notifier =
-                          widget.ref.read(userStateProvider.notifier);
-                      final current = user.todayPlan[widget.block.id] ??
-                          DayPlanBlock(
-                            blockId: widget.block.id,
-                            outcome: null,
-                            methodIds: const [],
-                            doneMethodIds: const [],
-                            done: false,
-                          );
-                      final next = List<String>.from(current.methodIds);
-                      final nextDone =
-                          List<String>.from(current.doneMethodIds);
-                      if (selected) {
-                        next.remove(m.id);
-                        nextDone.remove(m.id);
-                      } else {
-                        next.add(m.id);
-                      }
-                      notifier.setDayPlanBlock(
-                        current.copyWith(
-                          methodIds: next,
-                          doneMethodIds: nextDone,
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1),
-                ],
-              );
-            }),
-        ],
-      ),
-    );
-  }
 }
 
 class _BlockCatalogSheet extends StatelessWidget {
@@ -707,8 +590,12 @@ class _BlockCatalogSheet extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Blöcke hinzufügen',
-            style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          'Blöcke hinzufügen',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
         const SizedBox(height: 12),
         if (available.isEmpty)
           const Text('Keine weiteren Blöcke verfügbar.')

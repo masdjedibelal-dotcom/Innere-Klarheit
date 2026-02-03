@@ -186,10 +186,10 @@ final Map<String, AppCopyItem> appCopy = {
     key: 'identity.mission',
     screen: 'identity',
     section: 'section',
-    title: 'Mission Statement',
+    title: 'Leitbild',
     subtitle: 'Baue dein Leitbild ohne Tippen.',
     body:
-        'Wähle Chips: Ich stehe für … / Ich baue … / Ich schütze … / Ich liefere … → wir rendern daraus dein Statement.',
+        'Wähle Chips: Ich stehe für … / Ich baue … / Ich schütze … / Ich liefere … → wir rendern daraus dein Leitbild.',
     ctaPrimary: '',
     ctaSecondary: '',
     tags: ['identity', 'mission'],

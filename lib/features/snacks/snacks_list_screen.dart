@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../state/snacks_state.dart';
 import '../../widgets/common/editorial_card.dart';
@@ -24,13 +23,6 @@ class _SnacksListScreenState extends ConsumerState<SnacksListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Snacks'),
-        actions: [
-          IconButton(
-            onPressed: () => context.push('/profil'),
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Profil',
-          ),
-        ],
       ),
       body: snacksAsync.when(
         data: (snacks) {

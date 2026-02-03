@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../state/snacks_state.dart';
@@ -103,27 +102,6 @@ class SnackDetailScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, bool isSaved) async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) {
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Login erforderlich'),
-          content:
-              const Text('Bitte melde dich an, um Snacks zu speichern.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Schließen'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                context.push('/profil');
-              },
-              child: const Text('Zum Profil'),
-            ),
-          ],
-        ),
-      );
       return;
     }
 

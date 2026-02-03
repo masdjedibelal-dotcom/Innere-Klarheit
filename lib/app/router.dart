@@ -6,7 +6,6 @@ import '../features/innen/innen_screen.dart';
 import '../features/identitaet/identitaet_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/profil/profil_screen.dart';
-import '../features/mission/mission_screen.dart';
 import '../features/system/system_screen.dart';
 import '../features/snacks/snacks_list_screen.dart';
 import 'shell_scaffold.dart';
@@ -51,10 +50,6 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/profil',
       builder: (context, state) => const ProfilScreen(),
-    ),
-    GoRoute(
-      path: '/mission',
-      builder: (context, state) => const MissionScreen(),
     ),
     GoRoute(
       path: '/snacks',

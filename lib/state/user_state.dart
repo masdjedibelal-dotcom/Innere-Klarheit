@@ -10,6 +10,8 @@ import '../data/repositories/knowledge_repository.dart';
 import '../data/repositories/inner_repository.dart';
 import '../data/repositories/identity_repository.dart';
 import '../data/repositories/system_repository.dart';
+import '../data/repositories/user_profile_repository.dart';
+import '../data/repositories/daily_usage_repository.dart';
 import '../data/supabase/supabase_client_provider.dart';
 
 class DayPlanBlock {
@@ -118,7 +120,7 @@ class UserState {
 }
 
 class UserStateNotifier extends StateNotifier<UserState> {
-  UserStateNotifier()
+  UserStateNotifier(this._ref)
       : super(const UserState(
           savedKnowledgeSnackIds: {},
           savedInnerItemIds: {},
@@ -136,6 +138,8 @@ class UserStateNotifier extends StateNotifier<UserState> {
           remindersEnabled: false,
           reminderTime: '20:30',
         ));
+
+  final Ref _ref;
 
   void toggleSnackSaved(String id) {
     final next = Set<String>.from(state.savedKnowledgeSnackIds);
@@ -187,6 +191,7 @@ class UserStateNotifier extends StateNotifier<UserState> {
     final map = Map<String, DayPlanBlock>.from(state.todayPlan);
     map[block.blockId] = block;
     state = state.copyWith(todayPlan: map);
+    _syncDailyUsage();
   }
 
   void setPillarScore(String pillarId, double score) {
@@ -230,6 +235,21 @@ class UserStateNotifier extends StateNotifier<UserState> {
   void setReminderTime(String value) {
     state = state.copyWith(reminderTime: value);
   }
+
+  void _syncDailyUsage() {
+    final blocksCount = state.todayPlan.length;
+    final methodsCount = state.todayPlan.values
+        .map((b) => b.methodIds.length)
+        .fold<int>(0, (a, b) => a + b);
+    final repo = _ref.read(dailyUsageRepoProvider);
+    () async {
+      await repo.upsertDailySummary(
+        day: DateTime.now(),
+        blocksCount: blocksCount,
+        methodsCount: methodsCount,
+      );
+    }();
+  }
 }
 
 String _dateKey(DateTime date) {
@@ -241,7 +261,7 @@ String _dateKey(DateTime date) {
 
 final userStateProvider =
     StateNotifierProvider<UserStateNotifier, UserState>(
-        (ref) => UserStateNotifier());
+        (ref) => UserStateNotifier(ref));
 
 final knowledgeRepoProvider = Provider<KnowledgeRepository>((ref) =>
     KnowledgeRepository(client: ref.read(supabaseClientProvider)));
@@ -251,6 +271,10 @@ final identityRepoProvider = Provider<IdentityRepository>(
     (ref) => IdentityRepository(client: ref.read(supabaseClientProvider)));
 final systemRepoProvider = Provider<SystemRepository>(
     (ref) => SystemRepository(client: ref.read(supabaseClientProvider)));
+final userProfileRepoProvider = Provider<UserProfileRepository>(
+    (ref) => UserProfileRepository(client: ref.read(supabaseClientProvider)));
+final dailyUsageRepoProvider = Provider<DailyUsageRepository>(
+    (ref) => DailyUsageRepository(client: ref.read(supabaseClientProvider)));
 
 final knowledgeProvider =
     FutureProvider<List<KnowledgeSnack>>((ref) async {

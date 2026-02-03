@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 Future<T?> showBottomCardSheet<T>({
   required BuildContext context,
   required Widget child,
+  double maxHeightFactor = 0.5,
 }) {
   final controller = AnimationController(
     vsync: Navigator.of(context),
@@ -10,8 +11,13 @@ Future<T?> showBottomCardSheet<T>({
     reverseDuration: const Duration(milliseconds: 200),
   );
 
+  final clamped = maxHeightFactor.clamp(0.3, 1.0);
+  final maxHeight = MediaQuery.of(context).size.height * clamped;
+
   return showModalBottomSheet<T>(
     context: context,
+    isDismissible: true,
+    enableDrag: true,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
@@ -19,7 +25,12 @@ Future<T?> showBottomCardSheet<T>({
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (_) => BottomCardSheet(child: child),
+    builder: (_) => BottomCardSheet(
+      child: SizedBox(
+        height: maxHeight,
+        child: child,
+      ),
+    ),
   );
 }
 

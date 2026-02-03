@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../content/app_copy.dart';
 import '../../data/models/catalog_item.dart';
 import '../../data/models/inner_catalog_detail.dart';
 import '../../data/models/inner_item.dart';
 import '../../state/inner_catalog_state.dart';
+import '../../ui/components/screen_hero.dart';
 import '../../widgets/bottom_sheet/bottom_card_sheet.dart';
 import '../../widgets/common/selection_list_row.dart';
 
@@ -44,68 +44,87 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
     final selectedValuesAsync = ref.watch(userSelectedValuesProvider);
     final selectedDriversAsync = ref.watch(userSelectedDriversProvider);
     final selectedPersonalityAsync = ref.watch(userSelectedPersonalityProvider);
-    final screenIntro = copy('inner.intro');
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Innen'),
-        actions: [
-          IconButton(
-            onPressed: () => context.push('/profil'),
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Profil',
+      appBar: null,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ScreenHero(
+                title: 'Innen',
+                subtitle:
+                    'Stärken, Werte, Antreiber und Persönlichkeit: wähle aus, was dich beschreibt – und nutze es als Orientierung im Alltag.',
+              ),
+              _TabChipBar(
+                controller: _tab,
+                tabs: const ['Stärken', 'Persönlichkeit', 'Werte', 'Antreiber'],
+              ),
+              _buildActiveCatalog(
+                context,
+                strengthsAsync: strengthsAsync,
+                valuesAsync: valuesAsync,
+                driversAsync: driversAsync,
+                personalityAsync: personalityAsync,
+                selectedStrengthsAsync: selectedStrengthsAsync,
+                selectedValuesAsync: selectedValuesAsync,
+                selectedDriversAsync: selectedDriversAsync,
+                selectedPersonalityAsync: selectedPersonalityAsync,
+              ),
+            ],
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (screenIntro.title.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: _IntroBlock(copy: screenIntro),
-            ),
-          _TabChipBar(
-            controller: _tab,
-            tabs: const ['Stärken', 'Persönlichkeit', 'Werte', 'Antreiber'],
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tab,
-              children: [
-                _buildCatalogList(
-                  context,
-                  itemsAsync: strengthsAsync,
-                  selectedAsync: selectedStrengthsAsync,
-                  type: InnerType.staerken,
-                  kind: _CatalogKind.strength,
-                ),
-                _buildCatalogList(
-                  context,
-                  itemsAsync: personalityAsync,
-                  selectedAsync: selectedPersonalityAsync,
-                  type: InnerType.persoenlichkeit,
-                  kind: _CatalogKind.personality,
-                ),
-                _buildCatalogList(
-                  context,
-                  itemsAsync: valuesAsync,
-                  selectedAsync: selectedValuesAsync,
-                  type: InnerType.werte,
-                  kind: _CatalogKind.value,
-                ),
-                _buildCatalogList(
-                  context,
-                  itemsAsync: driversAsync,
-                  selectedAsync: selectedDriversAsync,
-                  type: InnerType.antreiber,
-                  kind: _CatalogKind.driver,
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
+  }
+
+  Widget _buildActiveCatalog(
+    BuildContext context, {
+    required AsyncValue<List<InnerCatalogDetail>> strengthsAsync,
+    required AsyncValue<List<InnerCatalogDetail>> valuesAsync,
+    required AsyncValue<List<InnerCatalogDetail>> driversAsync,
+    required AsyncValue<List<InnerCatalogDetail>> personalityAsync,
+    required AsyncValue<List<CatalogItem>> selectedStrengthsAsync,
+    required AsyncValue<List<CatalogItem>> selectedValuesAsync,
+    required AsyncValue<List<CatalogItem>> selectedDriversAsync,
+    required AsyncValue<List<CatalogItem>> selectedPersonalityAsync,
+  }) {
+    switch (_tab.index) {
+      case 0:
+        return _buildCatalogList(
+          context,
+          itemsAsync: strengthsAsync,
+          selectedAsync: selectedStrengthsAsync,
+          type: InnerType.staerken,
+          kind: _CatalogKind.strength,
+        );
+      case 1:
+        return _buildCatalogList(
+          context,
+          itemsAsync: personalityAsync,
+          selectedAsync: selectedPersonalityAsync,
+          type: InnerType.persoenlichkeit,
+          kind: _CatalogKind.personality,
+        );
+      case 2:
+        return _buildCatalogList(
+          context,
+          itemsAsync: valuesAsync,
+          selectedAsync: selectedValuesAsync,
+          type: InnerType.werte,
+          kind: _CatalogKind.value,
+        );
+      case 3:
+        return _buildCatalogList(
+          context,
+          itemsAsync: driversAsync,
+          selectedAsync: selectedDriversAsync,
+          type: InnerType.antreiber,
+          kind: _CatalogKind.driver,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   Widget _buildCatalogList(
@@ -120,7 +139,8 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
     return itemsAsync.when(
       data: (items) {
         if (items.isEmpty) {
-          return const Center(
+          return const Padding(
+            padding: EdgeInsets.fromLTRB(30, 12, 30, 24),
             child: Text('Noch kein Inhalt verfügbar.'),
           );
         }
@@ -128,9 +148,11 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
                 .map((e) => e.id)
                 .toSet() ??
             <String>{};
-        return ListView(
-          padding: const EdgeInsets.only(top: 12, bottom: 24),
-          children: [
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(30, 12, 30, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             if (intro.title.isNotEmpty) _IntroBlock(copy: intro),
             ...items.map((e) {
               final selected = selectedIds.contains(e.id);
@@ -172,10 +194,15 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
               );
             }),
           ],
+          ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const Center(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const Padding(
+        padding: EdgeInsets.fromLTRB(30, 12, 30, 24),
         child: Text('Innen-Daten konnten nicht geladen werden.'),
       ),
     );
@@ -189,35 +216,53 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
     required _CatalogKind kind,
   }) {
     final theme = Theme.of(context);
+    final maxHeight = MediaQuery.of(context).size.height * 0.5;
     showBottomCardSheet(
       context: context,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(item.title, style: theme.textTheme.titleLarge),
-          const SizedBox(height: 8),
-          if (item.description.isNotEmpty) Text(item.description),
-          ..._buildDetailSections(item, kind, theme),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton(
-                  onPressed: () async {
-                    await _toggleSelection(
-                      context,
-                      kind: kind,
-                      itemId: item.id,
-                      selectedIds: selectedIds,
-                    );
-                    Navigator.pop(context);
-                  },
-                  child: Text(selected ? 'Entfernen' : 'Auswählen'),
+      child: SizedBox(
+        height: maxHeight,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.title, style: theme.textTheme.titleLarge),
+                    const SizedBox(height: 6),
+                    if (item.description.isNotEmpty)
+                      Text(
+                        item.description,
+                        style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+                      ),
+                    ..._buildDetailSections(item, kind, theme),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () async {
+                      await _toggleSelection(
+                        context,
+                        kind: kind,
+                        itemId: item.id,
+                        selectedIds: selectedIds,
+                      );
+                      Navigator.pop(context);
+                    },
+                    child: Text(selected ? 'Entfernen' : 'Auswählen'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -263,46 +308,123 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
   List<Widget> _buildDetailSections(
       InnerCatalogDetail item, _CatalogKind kind, ThemeData theme) {
     final sections = <Widget>[];
-    void addSection(String title, List<String> lines) {
+    void addBullets(String title, List<String> lines) {
       if (lines.isEmpty) return;
-      sections.add(const SizedBox(height: 12));
-      sections.add(Text(title, style: theme.textTheme.labelLarge));
+      sections.add(const SizedBox(height: 10));
+      sections.add(_sectionTitle(title, theme));
       sections.add(const SizedBox(height: 6));
-      sections.addAll(lines.map((e) => Text('• $e')));
+      sections.addAll(lines.map((e) => _bulletItem(e, theme)));
+    }
+
+    void addChips(String title, List<String> lines) {
+      if (lines.isEmpty) return;
+      sections.add(const SizedBox(height: 10));
+      sections.add(_sectionTitle(title, theme));
+      sections.add(const SizedBox(height: 6));
+      sections.add(_chipWrap(lines, theme));
     }
 
     void addTextSection(String title, String body) {
       if (body.isEmpty) return;
-      sections.add(const SizedBox(height: 12));
-      sections.add(Text(title, style: theme.textTheme.labelLarge));
+      sections.add(const SizedBox(height: 10));
+      sections.add(_sectionTitle(title, theme));
       sections.add(const SizedBox(height: 6));
-      sections.add(Text(body));
+      sections.add(Text(body, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)));
+    }
+
+    void addReflection(String title, List<String> questions) {
+      if (questions.isEmpty) return;
+      sections.add(const SizedBox(height: 10));
+      sections.add(_sectionTitle(title, theme));
+      sections.add(const SizedBox(height: 6));
+      sections.addAll(questions.map((q) => _reflectionCard(q, theme)));
     }
 
     switch (kind) {
       case _CatalogKind.strength:
-        addSection('Beispiele', item.examples);
-        addSection('Einsatzfelder', item.useCases);
-        addTextSection('Reflexionsfrage', item.reflectionQuestion);
+        addBullets('Beispiele', item.examples);
+        addChips('Einsatzfelder', item.useCases);
+        addReflection('Reflexionsfrage',
+            item.reflectionQuestion.isEmpty ? [] : [item.reflectionQuestion]);
         break;
       case _CatalogKind.value:
-        addSection('Beispiele', item.examples);
-        addTextSection('Reflexionsfrage', item.reflectionQuestion);
+        addBullets('Beispiele', item.examples);
+        addReflection('Reflexionsfrage',
+            item.reflectionQuestion.isEmpty ? [] : [item.reflectionQuestion]);
         break;
       case _CatalogKind.driver:
         addTextSection('Schutzfunktion', item.protectionFunction);
         addTextSection('Schattenseite', item.shadowSide);
         addTextSection('Neurahmung', item.reframe);
-        addSection('Beispiele', item.examples);
-        addSection('Reflexionsfragen', item.reflectionQuestions);
+        addBullets('Beispiele', item.examples);
+        addReflection('Reflexionsfragen', item.reflectionQuestions);
         break;
       case _CatalogKind.personality:
-        addSection('Hilft bei', item.helpsWith);
-        addSection('Achte auf', item.watchOutFor);
-        addTextSection('Reflexionsfrage', item.reflectionQuestion);
+        addChips('Hilft bei', item.helpsWith);
+        addChips('Achte auf', item.watchOutFor);
+        addReflection('Reflexionsfrage',
+            item.reflectionQuestion.isEmpty ? [] : [item.reflectionQuestion]);
         break;
     }
     return sections;
+  }
+
+  Widget _sectionTitle(String title, ThemeData theme) {
+    return Text(title, style: theme.textTheme.labelLarge);
+  }
+
+  Widget _bulletItem(String text, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        '• $text',
+        style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+      ),
+    );
+  }
+
+  Widget _chipWrap(List<String> items, ThemeData theme) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: items
+          .map(
+            (item) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                item,
+                style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.75),
+                    ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _reflectionCard(String text, ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        text,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              height: 1.4,
+            ),
+      ),
+    );
   }
 
   Widget? _levelFooter({
@@ -397,7 +519,7 @@ class _IntroBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -441,16 +563,27 @@ class _TabChipBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 52,
+      height: 44,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 4),
         scrollDirection: Axis.horizontal,
         itemBuilder: (_, i) {
           final selected = controller.index == i;
+          final scheme = Theme.of(context).colorScheme;
           return ChoiceChip(
             label: Text(tabs[i]),
             selected: selected,
             onSelected: (_) => controller.animateTo(i),
+            backgroundColor: scheme.surfaceVariant,
+            selectedColor: scheme.surfaceVariant.withOpacity(0.8),
+            labelStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurface.withOpacity(0.7),
+                ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.transparent),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           );
         },
         separatorBuilder: (_, __) => const SizedBox(width: 8),
