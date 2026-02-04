@@ -287,10 +287,22 @@ class _BlockSection extends ConsumerWidget {
           _TimelineIcon(icon: _iconForBlock(block), isLast: isLast),
           const SizedBox(width: 12),
           Expanded(
-            child: EditorialCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: selectedMethods.isEmpty
+                    ? null
+                    : () => _openMethodCatalog(
+                          context,
+                          block,
+                          methods,
+                          initialTab: MethodCatalogSheet.selectedTabLabel,
+                        ),
+                child: EditorialCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -325,65 +337,142 @@ class _BlockSection extends ConsumerWidget {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  if (selectedMethods.isEmpty)
-                    Text(
-                      'Noch keine Methoden ausgewählt.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.7),
-                          ),
-                    )
-                  else
-                    ...selectedMethods.map(
-                      (m) {
-                        final isDone = doneIds.contains(m.id);
-                        return Column(
-                          children: [
-                            _MethodRow(
-                              method: m,
-                              trailing: IconButton(
-                                onPressed: () {
-                                  final notifier =
-                                      ref.read(userStateProvider.notifier);
-                                  final nextDone =
-                                      List<String>.from(doneIds);
-                                  if (isDone) {
-                                    nextDone.remove(m.id);
-                                  } else {
-                                    nextDone.add(m.id);
-                                  }
-                                  notifier.setDayPlanBlock(
-                                    plan.blockId.isEmpty
-                                        ? DayPlanBlock(
-                                            blockId: block.id,
-                                            outcome: null,
-                                            methodIds: selectedIds,
-                                            doneMethodIds: nextDone,
-                                            done: false,
-                                          )
-                                        : plan.copyWith(
-                                            doneMethodIds: nextDone,
-                                          ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: selectedMethods.isEmpty
+                        ? Text(
+                            'Noch keine Methoden ausgewählt.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.7),
+                                ),
+                          )
+                        : Column(
+                            children: [
+                              ...selectedMethods.take(3).map(
+                                (m) {
+                                  final isDone = doneIds.contains(m.id);
+                                  return Column(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 6,
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    m.title,
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.copyWith(
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                  ),
+                                                  if (m.shortDesc.isNotEmpty)
+                                                    Text(
+                                                      m.shortDesc,
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .labelSmall
+                                                          ?.copyWith(
+                                                            color: Theme.of(
+                                                                    context)
+                                                                .colorScheme
+                                                                .onSurface
+                                                                .withOpacity(
+                                                                    0.7),
+                                                          ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                            IconButton(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              onPressed: () {
+                                                final notifier = ref.read(
+                                                    userStateProvider.notifier);
+                                                final nextDone =
+                                                    List<String>.from(doneIds);
+                                                if (isDone) {
+                                                  nextDone.remove(m.id);
+                                                } else {
+                                                  nextDone.add(m.id);
+                                                }
+                                                notifier.setDayPlanBlock(
+                                                  plan.blockId.isEmpty
+                                                      ? DayPlanBlock(
+                                                          blockId: block.id,
+                                                          outcome: null,
+                                                          methodIds:
+                                                              selectedIds,
+                                                          doneMethodIds:
+                                                              nextDone,
+                                                          done: false,
+                                                        )
+                                                      : plan.copyWith(
+                                                          doneMethodIds:
+                                                              nextDone,
+                                                        ),
+                                                );
+                                              },
+                                              icon: Icon(
+                                                isDone
+                                                    ? Icons.check_circle
+                                                    : Icons.circle_outlined,
+                                                size: 20,
+                                                color: isDone
+                                                    ? Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                    : Theme.of(context)
+                                                        .iconTheme
+                                                        .color,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Divider(height: 1),
+                                    ],
                                   );
                                 },
-                                icon: Icon(
-                                  isDone
-                                      ? Icons.check_circle
-                                      : Icons.circle_outlined,
-                                  color: isDone
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).iconTheme.color,
-                                ),
                               ),
-                              onTap: () => _openMethodDetails(context, m),
-                            ),
-                            const Divider(height: 1),
-                          ],
-                        );
-                      },
-                    ),
+                              if (selectedMethods.length > 3) ...[
+                                const SizedBox(height: 4),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    '+${selectedMethods.length - 3} weitere',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.6),
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                  ),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -393,7 +482,9 @@ class _BlockSection extends ConsumerWidget {
                       child: const Text('Methoden hinzufügen'),
                     ),
                   ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -560,13 +651,15 @@ void _openMethodDetails(BuildContext context, MethodV2 m) {
 void _openMethodCatalog(
   BuildContext context,
   SystemBlock block,
-  List<MethodV2> methods,
-) {
+  List<MethodV2> methods, {
+  String? initialTab,
+}) {
   showBottomCardSheet(
     context: context,
     child: MethodCatalogSheet(
       block: block,
       methods: methods,
+      initialTab: initialTab,
     ),
   );
 }
@@ -606,8 +699,18 @@ class _BlockCatalogSheet extends StatelessWidget {
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                   leading: _TimelineIcon(icon: _iconForBlock(b), isLast: true),
-                  title: Text(b.title),
-                  subtitle: b.desc.isEmpty ? null : Text(b.desc),
+                  title: Text(
+                    b.title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  subtitle: b.desc.isEmpty
+                      ? null
+                      : Text(
+                          b.desc,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                   trailing: const Icon(Icons.add_circle_outline),
                   onTap: () {
                     onAdd(b.id);

@@ -346,10 +346,30 @@ class _CompleteState extends StatelessWidget {
               itemBuilder: (_, i) {
                 final t = templates[i];
                 final selected = t.id == selectedTemplateId;
+                final scheme = Theme.of(context).colorScheme;
                 return ChoiceChip(
                   label: Text(t.tone.isEmpty ? t.key : t.tone),
                   selected: selected,
                   onSelected: (_) => onSelectTemplate(t.id),
+                  backgroundColor: scheme.surfaceVariant,
+                  selectedColor: scheme.primary.withOpacity(0.16),
+                  labelStyle: theme.textTheme.labelSmall?.copyWith(
+                    color: selected
+                        ? scheme.primary
+                        : scheme.onSurface.withOpacity(0.7),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: selected
+                          ? scheme.primary.withOpacity(0.35)
+                          : Colors.transparent,
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                 );
               },
               separatorBuilder: (_, __) => const SizedBox(width: 8),

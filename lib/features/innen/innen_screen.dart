@@ -563,9 +563,9 @@ class _TabChipBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: 56,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
         scrollDirection: Axis.horizontal,
         itemBuilder: (_, i) {
           final selected = controller.index == i;
@@ -575,13 +575,19 @@ class _TabChipBar extends StatelessWidget {
             selected: selected,
             onSelected: (_) => controller.animateTo(i),
             backgroundColor: scheme.surfaceVariant,
-            selectedColor: scheme.surfaceVariant.withOpacity(0.8),
+            selectedColor: scheme.primary.withOpacity(0.16),
             labelStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurface.withOpacity(0.7),
+                  color: selected
+                      ? scheme.primary
+                      : scheme.onSurface.withOpacity(0.7),
                 ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: Colors.transparent),
+              side: BorderSide(
+                color: selected
+                    ? scheme.primary.withOpacity(0.35)
+                    : Colors.transparent,
+              ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           );

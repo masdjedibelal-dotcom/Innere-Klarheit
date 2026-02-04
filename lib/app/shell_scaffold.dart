@@ -26,6 +26,10 @@ class ShellScaffold extends StatelessWidget {
           ? BottomNavigationBar(
               currentIndex: currentIndex,
               onTap: (index) {
+                final rootNavigator = Navigator.of(context, rootNavigator: true);
+                if (rootNavigator.canPop()) {
+                  rootNavigator.pop();
+                }
                 switch (index) {
                   case 0:
                     context.go('/home');

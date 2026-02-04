@@ -315,10 +315,27 @@ class _FilterBar extends StatelessWidget {
         itemBuilder: (_, i) {
           final f = filters[i];
           final selected = f.value == active;
+          final scheme = Theme.of(context).colorScheme;
           return ChoiceChip(
             label: Text(f.label),
             selected: selected,
             onSelected: (_) => onChanged(f.value),
+            backgroundColor: scheme.surfaceVariant,
+            selectedColor: scheme.primary.withOpacity(0.16),
+            labelStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: selected
+                      ? scheme.primary
+                      : scheme.onSurface.withOpacity(0.7),
+                ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: selected
+                    ? scheme.primary.withOpacity(0.35)
+                    : Colors.transparent,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           );
         },
         separatorBuilder: (_, __) => const SizedBox(width: 8),

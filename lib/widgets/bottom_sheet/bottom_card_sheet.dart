@@ -25,11 +25,9 @@ Future<T?> showBottomCardSheet<T>({
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (_) => BottomCardSheet(
-      child: SizedBox(
-        height: maxHeight,
-        child: child,
-      ),
+    builder: (_) => SizedBox(
+      height: maxHeight,
+      child: BottomCardSheet(child: child),
     ),
   );
 }
