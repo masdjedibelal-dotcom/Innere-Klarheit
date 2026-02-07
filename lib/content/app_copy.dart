@@ -87,7 +87,7 @@ final Map<String, AppCopyItem> appCopy = {
     body:
         'Speichern legt den Snack ab. Wenn eine Methode passt, öffne sie direkt als Bottom Sheet.',
     ctaPrimary: 'Speichern',
-    ctaSecondary: 'Als Methode ansehen',
+    ctaSecondary: '',
     tags: ['knowledge', 'cta'],
     sortRank: 2,
   ),

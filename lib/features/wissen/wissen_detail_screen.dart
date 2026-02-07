@@ -118,17 +118,6 @@ class WissenDetailScreen extends ConsumerWidget {
                     .read(userStateProvider.notifier)
                     .toggleSnackSaved(snackId),
               ),
-              const SizedBox(width: 12),
-              if (ctaCopy.ctaSecondary.isNotEmpty)
-                SecondaryButton(
-                  label: ctaCopy.ctaSecondary,
-                  onPressed: () {},
-                )
-              else
-                SecondaryButton(
-                  label: 'Ins System übernehmen',
-                  onPressed: () {},
-                ),
               const Spacer(),
               PrimaryButton(
                 label: 'Weiter',

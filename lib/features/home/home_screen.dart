@@ -10,7 +10,7 @@ import '../../widgets/common/section_header.dart';
 import '../../widgets/common/carousel_tile.dart';
 import '../../widgets/bottom_sheet/bottom_card_sheet.dart';
 import '../../widgets/common/knowledge_snack_sheet.dart';
-import '../../widgets/bottom_sheet/method_catalog_sheet.dart';
+import '../../widgets/bottom_sheet/habit_sheet.dart';
 import '../../widgets/common/tag_chip.dart';
 import '../../state/user_state.dart';
 import '../../state/mission_state.dart';
@@ -18,8 +18,10 @@ import '../../state/user_selections_state.dart';
 import '../mission/leitbild_sheet.dart';
 import '../../data/models/catalog_item.dart';
 import '../../data/models/method_v2.dart';
+import '../../data/models/method_day_block.dart';
 import '../../data/models/system_block.dart';
 import '../../data/models/identity_pillar.dart';
+import '../system/system_habits.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -43,7 +45,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final knowledgeAsync = ref.watch(knowledgeProvider);
     final blocksAsync = ref.watch(systemBlocksProvider);
-    final methodsAsync = ref.watch(systemMethodsProvider);
+    final methodsAsync = ref.watch(systemHabitsProvider);
+    final methodDayBlocksAsync = ref.watch(systemMethodDayBlocksProvider);
     final user = ref.watch(userStateProvider);
     final missionAsync = ref.watch(userMissionStatementProvider);
     final selectedValuesAsync = ref.watch(userSelectedValuesProvider);
@@ -156,38 +159,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             data: (blocks) {
               return methodsAsync.when(
                 data: (methods) {
-                  final byBlock = _groupMethods(methods, blocks);
-                  return _CarouselSection(
-                    title: 'Tagesblöcke',
-                    height: 180,
-                    child: blocks.isEmpty
-                        ? const _EmptyState('Noch keine Blöcke verfügbar.')
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            scrollDirection: Axis.horizontal,
-                            itemBuilder: (_, i) {
-                              final block = blocks[i];
-                              final list = byBlock[block.id] ?? const [];
-                              return _BlockTodoTile(
-                                block: block,
-                                methods: list,
-                                selectedIds:
-                                    user.todayPlan[block.id]?.methodIds ?? const [],
-                                outcome: user.todayPlan[block.id]?.outcome,
-                                onTap: () => _showBlockDetails(
-                                  context,
-                                  block,
-                                  list,
-                                ),
-                              );
-                            },
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
-                            itemCount: blocks.length,
-                          ),
+                  return methodDayBlocksAsync.when(
+                    data: (links) {
+                      final byBlock = _groupHabits(methods, links, blocks);
+                      return _CarouselSection(
+                        title: 'Tagesblöcke',
+                        height: 180,
+                        child: blocks.isEmpty
+                            ? const _EmptyState('Noch keine Blöcke verfügbar.')
+                            : ListView.separated(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 20),
+                                scrollDirection: Axis.horizontal,
+                                itemBuilder: (_, i) {
+                                  final block = blocks[i];
+                                  final list = byBlock[block.id] ?? const [];
+                                  return _BlockTodoTile(
+                                    block: block,
+                                    methods: list,
+                                    selectedIds: user
+                                            .todayPlan[block.id]?.methodIds ??
+                                        const [],
+                                    outcome:
+                                        user.todayPlan[block.id]?.outcome,
+                                    onTap: () => _showBlockDetails(
+                                      context,
+                                      block,
+                                      methods,
+                                      links,
+                                    ),
+                                  );
+                                },
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 12),
+                                itemCount: blocks.length,
+                              ),
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) =>
+                        const _EmptyState('Noch kein Inhalt verfügbar.'),
                   );
                 },
                 loading: () => const SizedBox.shrink(),
-                error: (_, __) => const _EmptyState('Noch kein Inhalt verfügbar.'),
+                error: (_, __) =>
+                    const _EmptyState('Noch kein Inhalt verfügbar.'),
               );
             },
             loading: () => const SizedBox.shrink(),
@@ -849,27 +865,83 @@ void _showBlockDetails(
   BuildContext context,
   SystemBlock block,
   List<MethodV2> methods,
+  List<MethodDayBlock> links,
 ) {
+  final blockMethods = _methodsForBlock(methods, links, block.key);
+  final habits = blockMethods.where((m) {
+    if (m.blockRole == 'meta_hidden') return false;
+    if (isSystemLogicMethod(m)) return false;
+    return isHabitMethod(m);
+  }).toList();
   showBottomCardSheet(
     context: context,
-    child: MethodCatalogSheet(
+    child: HabitBlockSheet(
       block: block,
-      methods: methods,
+      habits: habits,
+      onHabitTap: (habit) {
+        final habitKey = habitKeyForMethod(habit) ?? habit.key;
+        showBottomCardSheet(
+          context: context,
+          child: Consumer(
+            builder: (context, ref, _) {
+              final async = ref.watch(systemHabitContentProvider(habitKey));
+              return async.when(
+                data: (items) => HabitSheet(
+                  habit: habit,
+                  contentItems: items,
+                ),
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (_, __) =>
+                    const Text('Inhalt konnte nicht geladen werden.'),
+              );
+            },
+          ),
+        );
+      },
     ),
   );
 }
 
 
-Map<String, List<MethodV2>> _groupMethods(
+Map<String, List<MethodV2>> _groupHabits(
   List<MethodV2> methods,
+  List<MethodDayBlock> links,
   List<SystemBlock> blocks,
 ) {
   final map = <String, List<MethodV2>>{};
   for (final block in blocks) {
-    final list =
-        methods.where((m) => m.contexts.contains(block.key)).toList();
+    final list = _methodsForBlock(methods, links, block.key).where((m) {
+      if (m.blockRole == 'meta_hidden') return false;
+      if (isSystemLogicMethod(m)) return false;
+      return isHabitMethod(m);
+    }).toList();
     map[block.id] = list;
   }
   return map;
+}
+
+List<MethodV2> _methodsForBlock(
+  List<MethodV2> methods,
+  List<MethodDayBlock> links,
+  String blockKey,
+) {
+  final byId = {for (final m in methods) m.id: m};
+  final matching = links
+      .where((l) => l.dayBlockKey == blockKey)
+      .toList()
+    ..sort((a, b) => a.sortRank.compareTo(b.sortRank));
+  final joined = <MethodV2>[];
+  for (final link in matching) {
+    final method = byId[link.methodId];
+    if (method != null) {
+      final role = link.blockRole.trim().isEmpty ? 'optional' : link.blockRole;
+      joined.add(method.copyWith(
+        blockRole: role,
+        defaultSelected: link.defaultSelected,
+      ));
+    }
+  }
+  return joined;
 }
 

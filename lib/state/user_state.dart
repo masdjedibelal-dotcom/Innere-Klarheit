@@ -5,6 +5,7 @@ import '../data/models/knowledge_snack.dart';
 import '../data/models/identity_pillar.dart';
 import '../data/models/identity_role.dart';
 import '../data/models/method_v2.dart';
+import '../data/models/method_day_block.dart';
 import '../data/models/system_block.dart';
 import '../data/repositories/knowledge_repository.dart';
 import '../data/repositories/inner_repository.dart';
@@ -194,6 +195,11 @@ class UserStateNotifier extends StateNotifier<UserState> {
     _syncDailyUsage();
   }
 
+  void clearDayPlan() {
+    state = state.copyWith(todayPlan: {});
+    _syncDailyUsage();
+  }
+
   void setPillarScore(String pillarId, double score) {
     final next = Map<String, double>.from(state.pillarScores);
     next[pillarId] = score;
@@ -310,6 +316,26 @@ final systemBlocksProvider = FutureProvider<List<SystemBlock>>((ref) async {
 
 final systemMethodsProvider = FutureProvider<List<MethodV2>>((ref) async {
   final result = await ref.read(systemRepoProvider).fetchMethods();
+  if (result.isSuccess) return result.data!;
+  throw result.error!;
+});
+
+final systemHabitsProvider = FutureProvider<List<MethodV2>>((ref) async {
+  final result = await ref.read(systemRepoProvider).fetchHabits();
+  if (result.isSuccess) return result.data!;
+  throw result.error!;
+});
+
+final systemHabitContentProvider =
+    FutureProvider.family<List<MethodV2>, String>((ref, habitKey) async {
+  final result = await ref.read(systemRepoProvider).fetchHabitContent(habitKey);
+  if (result.isSuccess) return result.data!;
+  throw result.error!;
+});
+
+final systemMethodDayBlocksProvider =
+    FutureProvider<List<MethodDayBlock>>((ref) async {
+  final result = await ref.read(systemRepoProvider).fetchMethodDayBlocks();
   if (result.isSuccess) return result.data!;
   throw result.error!;
 });

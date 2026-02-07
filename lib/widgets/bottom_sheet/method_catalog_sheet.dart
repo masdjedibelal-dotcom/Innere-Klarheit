@@ -41,8 +41,11 @@ class _MethodCatalogSheetState extends ConsumerState<MethodCatalogSheet> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(userStateProvider);
-    final selectedIds = user.todayPlan[widget.block.id]?.methodIds ?? const [];
+    final currentPlan = user.todayPlan[widget.block.id];
+    final hasPlan = currentPlan?.blockId.isNotEmpty ?? false;
+    final selectedIds = currentPlan?.methodIds ?? const [];
     final base = widget.methods.where((m) {
+      if (m.blockRole == 'meta_hidden') return false;
       if (!m.contexts.contains(widget.block.key)) return false;
       if (query.trim().isEmpty) return true;
       final q = query.toLowerCase();
@@ -61,8 +64,19 @@ class _MethodCatalogSheetState extends ConsumerState<MethodCatalogSheet> {
     if (!tabs.contains(_selectedCategory)) {
       _selectedCategory = _allTab;
     }
+    final requiredIds =
+        base.where((m) => m.blockRole == 'required').map((m) => m.id).toSet();
+    final defaultOptionalIds = base
+        .where((m) => m.blockRole == 'optional' && m.defaultSelected)
+        .map((m) => m.id)
+        .toSet();
+    final effectiveSelectedIds = {
+      ...requiredIds,
+      if (!hasPlan) ...defaultOptionalIds,
+      ...selectedIds,
+    };
     final selectedMethods =
-        base.where((m) => selectedIds.contains(m.id)).toList();
+        base.where((m) => effectiveSelectedIds.contains(m.id)).toList();
 
     Widget buildList(List<MethodV2> list) {
       if (list.isEmpty) {
@@ -80,19 +94,28 @@ class _MethodCatalogSheetState extends ConsumerState<MethodCatalogSheet> {
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (_, i) {
           final m = list[i];
-          final selected = selectedIds.contains(m.id);
+          final isRequired = m.blockRole == 'required';
+          final selected = effectiveSelectedIds.contains(m.id);
           final scheme = Theme.of(context).colorScheme;
           return _MethodRow(
             method: m,
             showExamples: true,
-            trailing: Icon(
-              selected ? Icons.check_circle_outline : Icons.add_circle_outline,
-              color: selected ? scheme.primary : scheme.onSurface.withOpacity(0.45),
-            ),
+            trailing: isRequired
+                ? null
+                : Icon(
+                    selected
+                        ? Icons.check_circle_outline
+                        : Icons.add_circle_outline,
+                    color: selected
+                        ? scheme.primary
+                        : scheme.onSurface.withOpacity(0.45),
+                  ),
             highlight: selected,
-            onTap: () {
+            onTap: isRequired
+                ? null
+                : () {
               final notifier = ref.read(userStateProvider.notifier);
-              final current = user.todayPlan[widget.block.id] ??
+              final current = currentPlan ??
                   DayPlanBlock(
                     blockId: widget.block.id,
                     outcome: null,
@@ -100,13 +123,18 @@ class _MethodCatalogSheetState extends ConsumerState<MethodCatalogSheet> {
                     doneMethodIds: const [],
                     done: false,
                   );
-              final next = List<String>.from(current.methodIds);
+              final next = List<String>.from(
+                hasPlan ? current.methodIds : defaultOptionalIds,
+              );
               final nextDone = List<String>.from(current.doneMethodIds);
               if (selected) {
                 next.remove(m.id);
                 nextDone.remove(m.id);
               } else {
                 next.add(m.id);
+              }
+              for (final id in requiredIds) {
+                if (!next.contains(id)) next.add(id);
               }
               notifier.setDayPlanBlock(
                 current.copyWith(
@@ -233,7 +261,7 @@ class _MethodRow extends StatelessWidget {
           color: highlight ? scheme.primary.withOpacity(0.06) : null,
           borderRadius: BorderRadius.circular(12),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        padding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
         child: Row(
           children: [
             Expanded(

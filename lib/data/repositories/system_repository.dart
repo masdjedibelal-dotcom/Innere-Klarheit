@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/method_day_block.dart';
 import '../models/method_v2.dart';
 import '../models/system_block.dart';
 import '../result.dart';
@@ -40,6 +41,53 @@ class SystemRepository {
     }
   }
 
+  Future<Result<List<MethodV2>>> fetchHabits() async {
+    try {
+      final methodRows = await _selectMethodsSimple(methodType: 'habit');
+      final linkRows = await _selectMethodDayBlocks();
+      final links = _groupMethodDayBlocks(linkRows);
+      _logTableRows('methods_simple (habits)', methodRows);
+      return Result.ok(
+          methodRows.map((row) => _mapMethod(row, links)).toList());
+    } on PostgrestException catch (e) {
+      _logRlsIfNeeded(e, 'methods_simple');
+      return Result.fail(_toError(e));
+    } catch (e) {
+      return Result.fail(DataError(message: 'methods_simple failed', cause: e));
+    }
+  }
+
+  Future<Result<List<MethodV2>>> fetchHabitContent(String habitKey) async {
+    try {
+      final methodRows = await _selectMethodsSimple(
+        methodType: 'habit_content',
+        habitKey: habitKey,
+      );
+      _logTableRows('methods_simple (habit_content)', methodRows);
+      return Result.ok(
+          methodRows.map((row) => _mapMethod(row, const {})).toList());
+    } on PostgrestException catch (e) {
+      _logRlsIfNeeded(e, 'methods_simple');
+      return Result.fail(_toError(e));
+    } catch (e) {
+      return Result.fail(DataError(message: 'methods_simple failed', cause: e));
+    }
+  }
+
+  Future<Result<List<MethodDayBlock>>> fetchMethodDayBlocks() async {
+    try {
+      final rows = await _selectMethodDayBlocks();
+      _logTableRows('method_day_blocks', rows);
+      return Result.ok(rows.map(_mapMethodDayBlock).toList());
+    } on PostgrestException catch (e) {
+      _logRlsIfNeeded(e, 'method_day_blocks');
+      return Result.fail(_toError(e));
+    } catch (e) {
+      return Result.fail(
+          DataError(message: 'method_day_blocks failed', cause: e));
+    }
+  }
+
   SystemBlock _mapBlock(Map<String, dynamic> row) {
     return SystemBlock(
       id: parseString(row['id']),
@@ -64,6 +112,13 @@ class SystemRepository {
       id: methodId,
       key: parseString(row['key'], fallback: category),
       pillarKey: pillarKey,
+      methodLevel: parseString(row['method_level']),
+      blockRole: parseString(row['block_role']),
+      defaultSelected: parseBool(row['default_selected']),
+      habitKey: parseString(row['habit_key']),
+      habitContent: parseString(row['habit_content']),
+      methodType: parseString(row['method_type']),
+      contentType: parseString(row['content_type']),
       category: category,
       title: parseString(row['title']),
       shortDesc: parseString(row['description']),
@@ -76,6 +131,17 @@ class SystemRepository {
       contexts: dayBlocks[methodId] ?? const [],
       isActive: parseBool(row['is_active']),
       sortRank: parseInt(row['sort_rank']),
+    );
+  }
+
+  MethodDayBlock _mapMethodDayBlock(Map<String, dynamic> row) {
+    return MethodDayBlock(
+      methodId: parseString(row['method_id']),
+      dayBlockKey: parseString(row['day_block_key']),
+      sortRank: parseInt(row['sort_rank']),
+      isActive: parseBool(row['is_active']),
+      blockRole: parseString(row['block_role']),
+      defaultSelected: parseBool(row['default_selected']),
     );
   }
 
@@ -99,22 +165,38 @@ class SystemRepository {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _selectMethodsSimple() async {
+  Future<List<Map<String, dynamic>>> _selectMethodsSimple({
+    String? methodType,
+    String? habitKey,
+  }) async {
     try {
-      final response = await _client
+      var query = _client
           .from('methods_simple')
           .select(
-              'id,key,pillar_key,category,title,description,duration_minutes,sort_rank,is_active')
-          .eq('is_active', true)
-          .order('sort_rank', ascending: true);
+              'id,key,pillar_key,method_type,content_type,method_level,block_role,default_selected,habit_key,habit_content,category,title,description,duration_minutes,sort_rank,is_active');
+      query = query.eq('is_active', true);
+      if (methodType != null && methodType.isNotEmpty) {
+        query = query.eq('method_type', methodType);
+      }
+      if (habitKey != null && habitKey.isNotEmpty) {
+        query = query.eq('habit_key', habitKey);
+      }
+      final response = await query.order('sort_rank', ascending: true);
       return (response as List).cast<Map<String, dynamic>>();
     } on PostgrestException catch (e) {
       if (_isMissingColumn(e)) {
-        final response = await _client
-            .from('methods_simple')
-            .select()
-            .order('sort_rank', ascending: true);
-        return (response as List).cast<Map<String, dynamic>>();
+        final response =
+            await _client.from('methods_simple').select().order('sort_rank', ascending: true);
+        final rows = (response as List).cast<Map<String, dynamic>>();
+        return rows.where((row) {
+          if (methodType != null && methodType.isNotEmpty) {
+            if (parseString(row['method_type']) != methodType) return false;
+          }
+          if (habitKey != null && habitKey.isNotEmpty) {
+            if (parseString(row['habit_key']) != habitKey) return false;
+          }
+          return true;
+        }).toList();
       }
       rethrow;
     }
@@ -124,7 +206,7 @@ class SystemRepository {
     try {
       final response = await _client
           .from('method_day_blocks')
-          .select('method_id,day_block_key,sort_rank,is_active')
+          .select('method_id,day_block_key,sort_rank,is_active,block_role,default_selected')
           .eq('is_active', true)
           .order('sort_rank', ascending: true);
       return (response as List).cast<Map<String, dynamic>>();

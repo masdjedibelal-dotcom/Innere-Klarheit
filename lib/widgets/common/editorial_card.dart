@@ -5,10 +5,12 @@ class EditorialCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
+    this.backgroundColor,
   });
 
   final Widget child;
   final EdgeInsets padding;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +18,7 @@ class EditorialCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: backgroundColor ?? scheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.transparent),
         boxShadow: [
