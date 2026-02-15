@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/models/knowledge_snack.dart';
 import '../../state/user_state.dart';
 import '../bottom_sheet/bottom_card_sheet.dart';
+import 'generated_media.dart';
 import 'tag_chip.dart';
 
 Future<void> showKnowledgeSnackSheet({
@@ -43,19 +44,13 @@ class KnowledgeSnackSheet extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
+          GeneratedMedia(
+            seed: snack.id,
             height: 140,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).colorScheme.surfaceVariant,
-                  Theme.of(context).colorScheme.surface.withOpacity(0.95),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
+            borderRadius: 20,
+            tags: snack.tags,
+            title: snack.title,
+            showIcon: true,
           ),
           const SizedBox(height: 20),
           Text(snack.title, style: Theme.of(context).textTheme.titleLarge),
