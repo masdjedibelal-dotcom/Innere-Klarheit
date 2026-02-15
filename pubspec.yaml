@@ -1,5 +1,5 @@
 name: clarityapp
-version: 0.1.1+8
+version: 0.1.1+9
 publish_to: 'none'
 
 description: Dark editorial habit/journal MVP
@@ -17,8 +17,25 @@ dependencies:
   supabase_flutter: ^2.6.0
   flutter_dotenv: ^5.1.0
 
+dev_dependencies:
+  flutter_native_splash: ^2.4.1
+  flutter_launcher_icons: ^0.13.1
+
 flutter:
   uses-material-design: true
   assets:
     - assets/env
     - assets/env.example
+    - assets/images/
+
+flutter_native_splash:
+  color: "#F7F7F8"
+  image: assets/images/app_icon.png
+  android_12:
+    image: assets/images/app_icon.png
+    icon_background_color: "#F7F7F8"
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/images/app_icon.png
