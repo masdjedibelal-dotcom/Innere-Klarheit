@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../state/user_state.dart';
 import '../../state/profile_state.dart';
@@ -9,6 +10,7 @@ import '../../widgets/bottom_sheet/bottom_card_sheet.dart';
 import '../../data/models/daily_usage_summary.dart';
 import '../../data/models/system_block.dart';
 import '../../data/models/method_v2.dart';
+import '../../data/supabase/auth_helpers.dart';
 
 class ProfilScreen extends ConsumerStatefulWidget {
   const ProfilScreen({super.key});
@@ -21,6 +23,7 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(userStateProvider);
+    final hasEmailLogin = isEmailUser(Supabase.instance.client);
 
     return Scaffold(
       appBar: AppBar(
@@ -31,11 +34,38 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
         ),
         title: const Text('Profil'),
         centerTitle: false,
+        actions: [
+          if (hasEmailLogin)
+            TextButton(
+              onPressed: () => _handleLogout(context),
+              child: const Text('Abmelden'),
+            ),
+        ],
       ),
       body: SafeArea(
         child: _ProfileDashboard(user: user),
       ),
     );
+  }
+
+  Future<void> _handleLogout(BuildContext context) async {
+    final client = Supabase.instance.client;
+    try {
+      await client.auth.signOut();
+      ref.read(userStateProvider.notifier).setLoggedIn(false);
+      ref.read(userStateProvider.notifier).setProfileName('');
+      ref.invalidate(userProfileProvider);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Abmelden fehlgeschlagen.')),
+      );
+    }
   }
 }
 
@@ -62,6 +92,7 @@ class _ProfileDashboardState extends ConsumerState<_ProfileDashboard> {
   Widget build(BuildContext context) {
     final user = widget.user;
     final profileAsync = ref.watch(userProfileProvider);
+    final hasEmailLogin = isEmailUser(Supabase.instance.client);
     final name = profileAsync.asData?.value.displayName.isNotEmpty == true
         ? profileAsync.asData!.value.displayName
         : 'Du';
@@ -141,6 +172,29 @@ class _ProfileDashboardState extends ConsumerState<_ProfileDashboard> {
               ],
             ),
           ),
+          if (!hasEmailLogin)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(30, 0, 30, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ohne Registrierung werden deine Daten nach dem Schließen der App gelöscht.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.7),
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: () => context.push('/auth'),
+                    child: const Text('Profil erstellen / Anmelden'),
+                  ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(30, 8, 30, 6),
             child: _CalendarHeader(
@@ -355,12 +409,7 @@ class _MonthCalendarGrid extends StatelessWidget {
                   color: _stateColor(context, state),
                   borderRadius: BorderRadius.circular(6),
                   border: state == UsageState.future
-                      ? Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withOpacity(0.2),
-                        )
+                      ? Border.all(color: Colors.transparent)
                       : null,
                 ),
                 child: Text(

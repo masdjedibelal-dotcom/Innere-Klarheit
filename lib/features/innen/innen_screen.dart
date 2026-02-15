@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../content/app_copy.dart';
 import '../../data/models/catalog_item.dart';
 import '../../data/models/inner_catalog_detail.dart';
 import '../../data/models/inner_item.dart';
 import '../../state/inner_catalog_state.dart';
+import '../../state/guest_selections_state.dart';
+import '../../state/user_state.dart';
 import '../../ui/components/screen_hero.dart';
 import '../../widgets/bottom_sheet/bottom_card_sheet.dart';
-import '../../widgets/common/selection_list_row.dart';
 
 class InnenScreen extends ConsumerStatefulWidget {
   const InnenScreen({super.key});
@@ -21,7 +24,6 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
   final Map<String, int> strengthLevels = {};
-  final Map<String, int> personalityLevels = {};
   final Set<String> expandedPersonalityIds = {};
 
   @override
@@ -32,6 +34,12 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
       if (!mounted) return;
       if (!_tab.indexIsChanging) setState(() {});
     });
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
   }
 
   @override
@@ -54,7 +62,7 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
               ScreenHero(
                 title: 'Innen',
                 subtitle:
-                    'Stärken, Werte, Antreiber und Persönlichkeit: wähle aus, was dich beschreibt – und nutze es als Orientierung im Alltag.',
+                    'Wähle Stärken, Werte, Antreiber und Persönlichkeit als Basis für deinen Tag.',
               ),
               _TabChipBar(
                 controller: _tab,
@@ -144,56 +152,179 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
             child: Text('Noch kein Inhalt verfügbar.'),
           );
         }
+        final user = ref.watch(userStateProvider);
         final selectedIds = selectedAsync.asData?.value
                 .map((e) => e.id)
                 .toSet() ??
             <String>{};
+        Widget buildCard(InnerCatalogDetail item) {
+          final selected = selectedIds.contains(item.id);
+          final isPersonality = kind == _CatalogKind.personality;
+          final expanded = expandedPersonalityIds.contains(item.id);
+          final currentLevel = user.personalityLevels[item.id] ?? 1;
+          return InkWell(
+            onTap: () => _openCatalogInfo(
+              context,
+              item: item,
+              selected: selected,
+              selectedIds: selectedIds,
+              kind: kind,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.transparent),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          isPersonality
+                              ? (expanded ? Icons.expand_less : Icons.tune)
+                              : (selected
+                                  ? Icons.check_circle_outline
+                                  : Icons.add_circle_outline),
+                          color: isPersonality
+                              ? Theme.of(context).colorScheme.primary
+                              : (selected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).iconTheme.color),
+                        ),
+                        onPressed: () {
+                          if (isPersonality) {
+                            setState(() {
+                              if (expandedPersonalityIds.contains(item.id)) {
+                                expandedPersonalityIds.remove(item.id);
+                              } else {
+                                expandedPersonalityIds.add(item.id);
+                              }
+                            });
+                            return;
+                          }
+                          _toggleSelection(
+                            context,
+                            kind: kind,
+                            item: CatalogItem(
+                              id: item.id,
+                              title: item.title,
+                              sortRank: item.sortRank,
+                            ),
+                            itemId: item.id,
+                            selectedIds: selectedIds,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  if (item.description.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      item.description,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.7),
+                          ),
+                    ),
+                  ],
+                  if (isPersonality) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text('Ausprägung',
+                            style: Theme.of(context).textTheme.labelSmall),
+                        const Spacer(),
+                        Text(
+                          _levelLabel(currentLevel),
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                    ),
+                    if (expanded)
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 3,
+                          thumbShape:
+                              const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        ),
+                        child: Slider(
+                          value: currentLevel.toDouble(),
+                          min: 0,
+                          max: 2,
+                          divisions: 2,
+                          onChanged: (v) {
+                            ref
+                                .read(userStateProvider.notifier)
+                                .setPersonalityLevel(item.id, v.round());
+                          },
+                        ),
+                      ),
+                  ],
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => _openCatalogInfo(
+                        context,
+                        item: item,
+                        selected: selected,
+                        selectedIds: selectedIds,
+                        kind: kind,
+                      ),
+                      child: const Text('Details'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         return Padding(
           padding: const EdgeInsets.fromLTRB(30, 12, 30, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            if (intro.title.isNotEmpty) _IntroBlock(copy: intro),
-            ...items.map((e) {
-              final selected = selectedIds.contains(e.id);
-              return Column(
-                children: [
-                  SelectionListRow(
-                    title: e.title,
-                    subtitle: e.description,
-                    selected: selected,
-                    footer: _levelFooter(
-                      kind: kind,
-                      itemId: e.id,
-                      expanded: expandedPersonalityIds.contains(e.id),
-                    ),
-                    trailing: _buildTrailing(
-                      kind: kind,
-                      selected: selected,
-                      isExpanded: expandedPersonalityIds.contains(e.id),
-                      onToggleExpand: () {
-                        setState(() {
-                          if (expandedPersonalityIds.contains(e.id)) {
-                            expandedPersonalityIds.remove(e.id);
-                          } else {
-                            expandedPersonalityIds.add(e.id);
-                          }
-                        });
-                      },
-                    ),
-                    onTap: () => _openCatalogInfo(
-                      context,
-                      item: e,
-                      selected: selected,
-                      selectedIds: selectedIds,
-                      kind: kind,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-              );
-            }),
-          ],
+              if (intro.title.isNotEmpty) _IntroBlock(copy: intro),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemBuilder: (_, i) => buildCard(items[i]),
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemCount: items.length,
+              ),
+            ],
           ),
         );
       },
@@ -245,20 +376,27 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () async {
-                      await _toggleSelection(
-                        context,
-                        kind: kind,
-                        itemId: item.id,
-                        selectedIds: selectedIds,
-                      );
-                      Navigator.pop(context);
-                    },
-                    child: Text(selected ? 'Entfernen' : 'Auswählen'),
+                if (kind != _CatalogKind.personality)
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () async {
+                        await _toggleSelection(
+                          context,
+                          kind: kind,
+                          item: CatalogItem(
+                            id: item.id,
+                            title: item.title,
+                            sortRank: item.sortRank,
+                          ),
+                          itemId: item.id,
+                          selectedIds: selectedIds,
+                        );
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                      },
+                      child: Text(selected ? 'Entfernen' : 'Auswählen'),
+                    ),
                   ),
-                ),
               ],
             ),
           ],
@@ -270,9 +408,25 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
   Future<void> _toggleSelection(
     BuildContext context, {
     required _CatalogKind kind,
+    required CatalogItem item,
     required String itemId,
     required Set<String> selectedIds,
   }) async {
+    if (!_hasEmailLogin()) {
+      _toggleGuestSelection(kind: kind, item: item);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+              'Ohne Registrierung werden deine Daten nach dem Schließen der App gelöscht.'),
+          action: SnackBarAction(
+            label: 'Registrieren',
+            onPressed: () => context.push('/auth'),
+          ),
+        ),
+      );
+      return;
+    }
     final next = Set<String>.from(selectedIds);
     if (!next.add(itemId)) {
       next.remove(itemId);
@@ -302,6 +456,7 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
     final msg = result.error?.message == 'Not logged in'
         ? 'Bitte anmelden, um auszuwählen.'
         : 'Auswahl konnte nicht gespeichert werden.';
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
@@ -436,7 +591,7 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
       return null;
     }
 
-    final current = personalityLevels[itemId] ?? 1;
+    final current = ref.watch(userStateProvider).personalityLevels[itemId] ?? 1;
     final label = _levelLabel(current);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,9 +616,9 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
               max: 2,
               divisions: 2,
               onChanged: (v) {
-                setState(() {
-                  personalityLevels[itemId] = v.round();
-                });
+                ref
+                    .read(userStateProvider.notifier)
+                    .setPersonalityLevel(itemId, v.round());
               },
             ),
           ),
@@ -509,6 +664,32 @@ class _InnenScreenState extends ConsumerState<InnenScreen>
       );
     }
     return const SizedBox.shrink();
+  }
+
+  bool _hasEmailLogin() {
+    final email = Supabase.instance.client.auth.currentUser?.email ?? '';
+    return email.isNotEmpty;
+  }
+
+  void _toggleGuestSelection({
+    required _CatalogKind kind,
+    required CatalogItem item,
+  }) {
+    final notifier = ref.read(guestSelectionsProvider.notifier);
+    switch (kind) {
+      case _CatalogKind.strength:
+        notifier.toggle(GuestSelectionKind.strength, item);
+        break;
+      case _CatalogKind.value:
+        notifier.toggle(GuestSelectionKind.value, item);
+        break;
+      case _CatalogKind.driver:
+        notifier.toggle(GuestSelectionKind.driver, item);
+        break;
+      case _CatalogKind.personality:
+        notifier.toggle(GuestSelectionKind.personality, item);
+        break;
+    }
   }
 }
 

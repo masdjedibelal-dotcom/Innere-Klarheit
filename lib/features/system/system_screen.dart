@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../widgets/bottom_sheet/bottom_card_sheet.dart';
 import '../../widgets/bottom_sheet/habit_sheet.dart';
@@ -8,6 +10,7 @@ import '../../widgets/common/editorial_card.dart';
 import '../../widgets/common/tag_chip.dart';
 import '../../ui/components/screen_hero.dart';
 import '../../state/user_state.dart';
+import '../../state/guest_day_plan_state.dart';
 import '../../state/system_tasks_state.dart';
 import '../../data/models/method_day_block.dart';
 import '../../data/models/method_v2.dart';
@@ -26,7 +29,10 @@ import '../dayflow/planner/rules/rule_frog.dart';
 import '../dayflow/planner/rules/rule_limit_135.dart';
 
 class SystemScreen extends ConsumerStatefulWidget {
-  const SystemScreen({super.key});
+  const SystemScreen({super.key, this.initialAction, this.initialTitle});
+
+  final String? initialAction;
+  final String? initialTitle;
 
   @override
   ConsumerState<SystemScreen> createState() => _SystemScreenState();
@@ -44,6 +50,8 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
   static const _sleepItemId = 'sleep';
   static const _defaultWakeTime = TimeOfDay(hour: 8, minute: 0);
   static const _defaultSleepTime = TimeOfDay(hour: 0, minute: 0);
+  static const _deepWorkMaxInstances = 2;
+  static const _todoMaxInstances = 3;
   static const _fixedHabitBlockKeys = [
     'morning_reset',
     'midday_reset',
@@ -71,6 +79,7 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
   List<String> _lastSyncedOrderIds = const [];
   bool _initialized = false;
   int _headerCount = 0;
+  bool _didAutoAction = false;
 
   @override
   Widget build(BuildContext context) {
@@ -82,16 +91,21 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
       appBar: null,
       body: SafeArea(
         child: blocksAsync.when(
-        data: (blocks) {
-          return methodsAsync.when(
-            data: (methods) {
-              return methodDayBlocksAsync.when(
-                data: (methodDayBlocks) {
-              if (blocks.isEmpty) {
-                return const Center(
-                  child: Text('Noch kein Inhalt verfügbar.'),
-                );
-              }
+          data: (blocks) {
+            return methodsAsync.when(
+              data: (methods) {
+                return methodDayBlocksAsync.when(
+                  data: (methodDayBlocks) {
+                    final seededMethods = withMiddayResetDefaultHabit(methods);
+                    final seededLinks = withMiddayResetDefaultHabitLink(
+                      methodDayBlocks,
+                      seededMethods,
+                    );
+                    if (blocks.isEmpty) {
+                      return const Center(
+                        child: Text('Noch kein Inhalt verfügbar.'),
+                      );
+                    }
 
               if (!_initialized) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -100,7 +114,9 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
               }
               _ensureDayLoaded(blocks, _selectedDate);
 
-              final byId = {for (final b in blocks) b.id: b};
+              final expandedBlocks =
+                  _expandBlocksWithInstances(blocks, _activeBlockIds);
+              final byId = {for (final b in expandedBlocks) b.id: b};
               final byKey = {for (final b in blocks) b.key: b};
               final morningBlock = byKey['morning_reset'];
               final middayBlock = byKey['midday_reset'];
@@ -127,6 +143,45 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
                 if (eveningBlock != null) eveningBlock,
                 ...eveningSegment,
               ];
+              if (!_didAutoAction &&
+                  widget.initialAction != null &&
+                  activeBlocks.isNotEmpty) {
+                _didAutoAction = true;
+                final title = widget.initialTitle?.trim();
+                final initialItem = title != null && title.isNotEmpty
+                    ? _buildPrefillItem(
+                        title,
+                        type: widget.initialAction == 'appointment'
+                            ? PlanningType.appointment
+                            : PlanningType.todo,
+                      )
+                    : null;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  switch (widget.initialAction) {
+                    case 'todo':
+                      _handleTodoSheet(
+                        context,
+                        blocks: activeBlocks,
+                        initialItem: initialItem,
+                      );
+                      break;
+                    case 'appointment':
+                      _handleAppointmentSheet(
+                        context,
+                        blocks: activeBlocks,
+                        initialItem: initialItem,
+                      );
+                      break;
+                    case 'habit':
+                      _showHabitBridge(context);
+                      break;
+                    case 'block':
+                      _openBlockCatalog(context, blocks);
+                      break;
+                  }
+                });
+              }
               _syncBlockOrder(activeBlocks);
               _orderedBlockIds
                 ..clear()
@@ -238,8 +293,8 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
                     onTogglePlannedItem: _togglePlannedItem,
                     methods: () {
                       final blockLinks = _methodsForBlock(
-                        methods,
-                        methodDayBlocks,
+                        seededMethods,
+                        seededLinks,
                         activeBlocks[i].key,
                       );
                       final metaHiddenMethods = blockLinks
@@ -259,8 +314,8 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
                     }(),
                     metaHiddenMethods: () {
                       final blockLinks = _methodsForBlock(
-                        methods,
-                        methodDayBlocks,
+                        seededMethods,
+                        seededLinks,
                         activeBlocks[i].key,
                       );
                       return blockLinks
@@ -389,6 +444,62 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
     final key = dateKey(date);
     if (_loadedDayKeys.contains(key) || _loadingDayKeys.contains(key)) return;
     _loadingDayKeys.add(key);
+    if (!_hasEmailLogin()) {
+      final entry = ref.read(guestDayPlanProvider).entryFor(date);
+      final items = <PlanningItem>[];
+      final completed = Set<String>.from(entry.completedItemIds);
+      TimeOfDay? wakeTime;
+      TimeOfDay? sleepTime;
+      for (final item in entry.items) {
+        if (_isMarkerItem(item.id)) {
+          final markerTime = item.fixedStart == null
+              ? null
+              : TimeOfDay(
+                  hour: item.fixedStart!.hour, minute: item.fixedStart!.minute);
+          if (item.id == _wakeItemId) {
+            wakeTime = markerTime;
+          } else if (item.id == _sleepItemId) {
+            sleepTime = markerTime;
+          }
+          continue;
+        }
+        items.add(item);
+      }
+      if (wakeTime == null) {
+        wakeTime = _defaultWakeTime;
+        _persistMarkerTime(
+          date,
+          markerId: _wakeItemId,
+          title: 'Aufwachen',
+          time: wakeTime,
+        );
+      }
+      if (sleepTime == null) {
+        sleepTime = _defaultSleepTime;
+        _persistMarkerTime(
+          date,
+          markerId: _sleepItemId,
+          title: 'Schlafen',
+          time: sleepTime,
+        );
+      }
+      _loadingDayKeys.remove(key);
+      _loadedDayKeys.add(key);
+      _wakeTimeByDate[key] = wakeTime;
+      _sleepTimeByDate[key] = sleepTime;
+      _planningItemsByDate[key] = List<PlanningItem>.from(items);
+      _completedPlanningItemIdsByDate[key] = Set<String>.from(completed);
+      _plannedAssignmentsByDate[key] = _planAssignments(
+        items: items,
+        blocks: blocks,
+      );
+      if (key == dateKey(_selectedDate)) {
+        setState(() {
+          _restoreDayState(date);
+        });
+      }
+      return;
+    }
     final repo = ref.read(dayPlanRepoProvider);
     final result = await repo.fetchDayPlan(date);
     if (!mounted) return;
@@ -549,12 +660,16 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
         fixedIds: _fixedBlockIds,
         onAdd: (id) {
           if (_fixedBlockIds.contains(id)) return;
-          if (_activeBlockIds.contains(id)) return;
-          setState(() => _activeBlockIds.add(id));
+          final block = blocks.firstWhere((b) => b.id == id, orElse: () => blocks.first);
+          final maxInstances = _maxInstancesForKey(block.key);
+          final count = _countInstancesForBase(id, _activeBlockIds);
+          if (count >= maxInstances) return;
+          final nextId = _nextInstanceId(id, _activeBlockIds);
+          setState(() => _activeBlockIds.add(nextId));
           ref.read(userStateProvider.notifier).setDayPlanBlockForDate(
                 _selectedDate,
                 DayPlanBlock(
-                  blockId: id,
+                  blockId: nextId,
                   outcome: null,
                   methodIds: const [],
                   doneMethodIds: const [],
@@ -564,11 +679,12 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
         },
         onRemove: (id) {
           if (_fixedBlockIds.contains(id)) return;
-          if (!_activeBlockIds.contains(id)) return;
-          setState(() => _activeBlockIds.remove(id));
+          final removeId = _latestInstanceId(id, _activeBlockIds);
+          if (removeId == null) return;
+          setState(() => _activeBlockIds.remove(removeId));
           ref
               .read(userStateProvider.notifier)
-              .removeDayPlanBlockForDate(_selectedDate, id);
+              .removeDayPlanBlockForDate(_selectedDate, removeId);
         },
       ),
     );
@@ -577,11 +693,13 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
   Future<void> _handleAppointmentSheet(
     BuildContext context, {
     required List<SystemBlock> blocks,
+    PlanningItem? initialItem,
   }) async {
     await _handlePlanningSheet(
       context,
       blocks: blocks,
       mode: _PlanningMode.appointment,
+      initialItem: initialItem,
     );
   }
 
@@ -635,17 +753,86 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
         blocks: blocks,
       );
     });
-    ref.read(dayPlanRepoProvider).upsertPlanningItem(
-          _selectedDate,
-          result.item,
-          completed: _completedPlanningItemIds.contains(result.item.id),
+    if (_hasEmailLogin()) {
+      ref.read(dayPlanRepoProvider).upsertPlanningItem(
+            _selectedDate,
+            result.item,
+            completed: _completedPlanningItemIds.contains(result.item.id),
+          );
+    } else {
+      ref.read(guestDayPlanProvider.notifier).upsertItem(
+            _selectedDate,
+            result.item,
+            completed: _completedPlanningItemIds.contains(result.item.id),
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Ohne Registrierung werden deine Daten nach dem Schließen der App gelöscht.'),
+            action: SnackBarAction(
+              label: 'Registrieren',
+              onPressed: () => context.push('/auth'),
+            ),
+          ),
         );
+      }
+    }
     _cacheDayState(_selectedDate);
     if (result.addAnother) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _handlePlanningSheet(context, blocks: blocks, mode: mode);
       });
     }
+  }
+
+  PlanningItem _buildPrefillItem(
+    String title, {
+    required PlanningType type,
+  }) {
+    return PlanningItem(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      title: title,
+      description: null,
+      type: type,
+      durationMin: 0,
+      priority: 2,
+      area: null,
+      fixedStart: null,
+    );
+  }
+
+  void _showHabitBridge(BuildContext context) {
+    showBottomCardSheet(
+      context: context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Als Habit übernehmen',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Wähle einen Block und füge eine passende Methode hinzu.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.7),
+                ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Alles klar'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Map<String, List<PlanningItem>> _planAssignments({
@@ -806,11 +993,19 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
       area: null,
       fixedStart: _markerDateTime(date, time),
     );
-    ref.read(dayPlanRepoProvider).upsertPlanningItem(
-          date,
-          item,
-          completed: false,
-        );
+    if (_hasEmailLogin()) {
+      ref.read(dayPlanRepoProvider).upsertPlanningItem(
+            date,
+            item,
+            completed: false,
+          );
+    } else {
+      ref.read(guestDayPlanProvider.notifier).upsertItem(
+            date,
+            item,
+            completed: false,
+          );
+    }
   }
 
   DateTime _markerDateTime(DateTime date, TimeOfDay time) {
@@ -863,10 +1058,14 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
       );
       _completedPlanningItemIds.remove(item.id);
     });
-    ref.read(dayPlanRepoProvider).deletePlanningItem(
-          _selectedDate,
-          item.id,
-        );
+    if (_hasEmailLogin()) {
+      ref.read(dayPlanRepoProvider).deletePlanningItem(
+            _selectedDate,
+            item.id,
+          );
+    } else {
+      ref.read(guestDayPlanProvider.notifier).removeItem(_selectedDate, item.id);
+    }
     _cacheDayState(_selectedDate);
   }
 
@@ -880,11 +1079,17 @@ class _SystemScreenState extends ConsumerState<SystemScreen> {
         ..clear()
         ..addAll(updated);
     });
-    ref.read(dayPlanRepoProvider).setPlanningItemCompleted(
-          _selectedDate,
-          item.id,
-          updated.contains(item.id),
-        );
+    if (_hasEmailLogin()) {
+      ref.read(dayPlanRepoProvider).setPlanningItemCompleted(
+            _selectedDate,
+            item.id,
+            updated.contains(item.id),
+          );
+    } else {
+      ref
+          .read(guestDayPlanProvider.notifier)
+          .setCompleted(_selectedDate, item.id, updated.contains(item.id));
+    }
     _cacheDayState(_selectedDate);
   }
 }
@@ -1010,6 +1215,11 @@ DayBlockType? _dayBlockTypeForKey(String key) {
     default:
       return null;
   }
+}
+
+bool _hasEmailLogin() {
+  final email = Supabase.instance.client.auth.currentUser?.email ?? '';
+  return email.isNotEmpty;
 }
 
 enum _DaySegment { morning, midday, evening }
@@ -1163,7 +1373,9 @@ void _showAddTaskSheet({
           controller: controller,
           decoration: const InputDecoration(
             hintText: 'Titel der Aufgabe',
-            border: OutlineInputBorder(),
+            border: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.transparent),
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -2226,9 +2438,15 @@ class _PlanningSheetState extends State<_PlanningSheet> {
   void initState() {
     super.initState();
     final initial = widget.initialItem;
-    if (initial == null || widget.mode != _PlanningMode.todo) return;
+    if (initial == null) return;
     _titleController.text = initial.title;
     _descriptionController.text = initial.description?.trim() ?? '';
+    if (widget.mode == _PlanningMode.appointment) {
+      if (initial.fixedStart != null) {
+        _appointmentTime = TimeOfDay.fromDateTime(initial.fixedStart!);
+      }
+      return;
+    }
     _priority = initial.priority == 1
         ? 'Hoch'
         : initial.priority == 3
@@ -2327,7 +2545,9 @@ class _PlanningSheetState extends State<_PlanningSheet> {
           controller: _titleController,
           decoration: InputDecoration(
             labelText: 'Titel',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.transparent),
+            ),
             filled: true,
             fillColor: surface.withOpacity(0.55),
           ),
@@ -2353,7 +2573,9 @@ class _PlanningSheetState extends State<_PlanningSheet> {
             decoration: InputDecoration(
               hintText: 'Worum geht es konkret?',
               counterText: '',
-              border: const OutlineInputBorder(),
+              border: const OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.transparent),
+              ),
               filled: true,
               fillColor: surface.withOpacity(0.55),
             ),
@@ -2485,7 +2707,7 @@ class _PlanningSheetState extends State<_PlanningSheet> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.2)),
+        border: Border.all(color: Colors.transparent),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2591,9 +2813,7 @@ class _TimePickerRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Theme.of(context).dividerColor.withOpacity(0.4),
-          ),
+          border: Border.all(color: Colors.transparent),
           color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
         ),
         child: Row(
@@ -3124,7 +3344,10 @@ class _BlockCatalogSheet extends StatelessWidget {
             const Text('Keine weiteren Blöcke verfügbar.')
           else
             ...candidates.map((b) {
-              final isActive = activeIds.contains(b.id);
+              final count = _countInstancesForBase(b.id, activeIds);
+              final max = _maxInstancesForKey(b.key);
+              final canAdd = count < max;
+              final canRemove = count > 0;
               return Column(
                 children: [
                   ListTile(
@@ -3142,19 +3365,24 @@ class _BlockCatalogSheet extends StatelessWidget {
                             b.desc,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                    trailing: Icon(
-                      isActive
-                          ? Icons.remove_circle_outline
-                          : Icons.add_circle_outline,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline),
+                          onPressed: canRemove ? () => onRemove(b.id) : null,
+                        ),
+                        Text(
+                          '$count/$max',
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline),
+                          onPressed: canAdd ? () => onAdd(b.id) : null,
+                        ),
+                      ],
                     ),
-                    onTap: () {
-                      if (isActive) {
-                        onRemove(b.id);
-                      } else {
-                        onAdd(b.id);
-                      }
-                      Navigator.pop(context);
-                    },
+                    onTap: null,
                   ),
                   const Divider(height: 1),
                 ],
@@ -3216,4 +3444,77 @@ IconData _iconForBlock(SystemBlock block) {
     default:
       return Icons.circle_outlined;
   }
+}
+
+const _blockInstanceSeparator = '__';
+
+int _maxInstancesForKey(String key) {
+  switch (key) {
+    case 'deep_work':
+      return _SystemScreenState._deepWorkMaxInstances;
+    case 'work_pomodoro':
+      return _SystemScreenState._todoMaxInstances;
+    default:
+      return 1;
+  }
+}
+
+String _baseBlockId(String id) {
+  final index = id.indexOf(_blockInstanceSeparator);
+  if (index == -1) return id;
+  return id.substring(0, index);
+}
+
+int _instanceIndexFor(String id) {
+  final index = id.indexOf(_blockInstanceSeparator);
+  if (index == -1) return 1;
+  final raw = id.substring(index + _blockInstanceSeparator.length);
+  return int.tryParse(raw) ?? 1;
+}
+
+int _countInstancesForBase(String baseId, Iterable<String> ids) {
+  return ids.where((id) => _baseBlockId(id) == baseId).length;
+}
+
+String _nextInstanceId(String baseId, Iterable<String> ids) {
+  final existing = ids.where((id) => _baseBlockId(id) == baseId).toList();
+  if (existing.isEmpty) return baseId;
+  final maxIndex =
+      existing.map(_instanceIndexFor).reduce((a, b) => a > b ? a : b);
+  return '$baseId$_blockInstanceSeparator${maxIndex + 1}';
+}
+
+String? _latestInstanceId(String baseId, Iterable<String> ids) {
+  final existing = ids.where((id) => _baseBlockId(id) == baseId).toList();
+  if (existing.isEmpty) return null;
+  existing.sort((a, b) => _instanceIndexFor(b).compareTo(_instanceIndexFor(a)));
+  return existing.first;
+}
+
+List<SystemBlock> _expandBlocksWithInstances(
+  List<SystemBlock> blocks,
+  Iterable<String> activeIds,
+) {
+  final byId = {for (final block in blocks) block.id: block};
+  final expanded = List<SystemBlock>.from(blocks);
+  for (final id in activeIds) {
+    if (byId.containsKey(id)) continue;
+    final baseId = _baseBlockId(id);
+    final base = byId[baseId];
+    if (base == null) continue;
+    final clone = SystemBlock(
+      id: id,
+      key: base.key,
+      title: base.title,
+      desc: base.desc,
+      outcomes: base.outcomes,
+      timeHint: base.timeHint,
+      icon: base.icon,
+      sortRank: base.sortRank,
+      isActive: base.isActive,
+    );
+    expanded.add(clone);
+    byId[id] = clone;
+  }
+  return expanded;
 }

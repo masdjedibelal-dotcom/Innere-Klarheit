@@ -27,6 +27,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final hero = copy('onboarding.hero');
     final system = copy('onboarding.system');
     final start = copy('onboarding.start');
+    final progressValue = (_index + 1) / 3;
 
     return Scaffold(
       appBar: AppBar(
@@ -34,14 +35,50 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Schritt ${_index + 1}/3',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: progressValue,
+                  minHeight: 6,
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceVariant
+                      .withOpacity(0.5),
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: PageView(
               controller: _controller,
               onPageChanged: (i) => setState(() => _index = i),
               children: [
-                _Page(copy: hero, index: 0),
-                _Page(copy: system, index: 1),
-                _Page(copy: start, index: 2),
+                _Page(
+                  copy: hero,
+                  index: 0,
+                  actionLabel: null,
+                  onAction: null,
+                ),
+                _Page(
+                  copy: system,
+                  index: 1,
+                  actionLabel: 'Innen öffnen',
+                  onAction: () => context.push('/innen'),
+                ),
+                _Page(
+                  copy: start,
+                  index: 2,
+                  actionLabel: 'Tagesplan öffnen',
+                  onAction: () => context.push('/system'),
+                ),
               ],
             ),
           ),
@@ -77,9 +114,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 }
 
 class _Page extends StatelessWidget {
-  const _Page({required this.copy, required this.index});
+  const _Page({
+    required this.copy,
+    required this.index,
+    required this.actionLabel,
+    required this.onAction,
+  });
   final AppCopyItem copy;
   final int index;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -131,6 +175,13 @@ class _Page extends StatelessWidget {
                         .onSurface
                         .withOpacity(0.75),
                   ),
+            ),
+          ],
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 20),
+            SecondaryButton(
+              label: actionLabel!,
+              onPressed: onAction,
             ),
           ],
         ],

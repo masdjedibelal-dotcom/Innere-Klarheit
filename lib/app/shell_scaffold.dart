@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class ShellScaffold extends StatelessWidget {
-  const ShellScaffold({super.key, required this.child});
+  const ShellScaffold({
+    super.key,
+    required this.child,
+  });
   final Widget child;
 
   int _indexFromLocation(String location) {
@@ -22,6 +25,12 @@ class ShellScaffold extends StatelessWidget {
 
     return Scaffold(
       body: child,
+      floatingActionButton: showBottomBar
+          ? FloatingActionButton(
+              onPressed: () => _openQuickAdd(context),
+              child: const Icon(Icons.add),
+            )
+          : null,
       bottomNavigationBar: showBottomBar
           ? BottomNavigationBar(
               currentIndex: currentIndex,
@@ -61,6 +70,86 @@ class ShellScaffold extends StatelessWidget {
               ],
             )
           : null,
+    );
+  }
+}
+
+void _openQuickAdd(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Theme.of(context).colorScheme.background,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    builder: (_) => _QuickAddSheet(rootContext: context),
+  );
+}
+
+class _QuickAddSheet extends StatelessWidget {
+  const _QuickAddSheet({required this.rootContext});
+
+  final BuildContext rootContext;
+
+  void _go(BuildContext context, String route) {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      rootContext.push(route);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Schnell hinzufügen', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Wähle, was du jetzt anlegen möchtest.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => _go(context, '/system?add=todo'),
+                child: const Text('To-Do'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => _go(context, '/system?add=appointment'),
+                child: const Text('Termin'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => _go(context, '/system?add=habit'),
+                child: const Text('Habit'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => _go(context, '/system?add=block'),
+                child: const Text('Block'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

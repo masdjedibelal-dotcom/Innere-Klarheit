@@ -1,3 +1,4 @@
+import '../../data/models/method_day_block.dart';
 import '../../data/models/method_v2.dart';
 
 const _systemLogicKeys = <String>{
@@ -50,6 +51,39 @@ const _habitDefinitions = <_HabitDefinition>[
   ),
 ];
 
+const _middayDefaultHabitId = 'habit_walk_after_meal';
+const _middayDefaultHabitKey = 'walk_after_meal';
+const _middayDefaultHabitTitle = 'Walk after Meal';
+
+List<MethodV2> withMiddayResetDefaultHabit(List<MethodV2> methods) {
+  if (methods.any(_isWalkAfterMealHabit)) return methods;
+  return [...methods, _walkAfterMealHabit()];
+}
+
+List<MethodDayBlock> withMiddayResetDefaultHabitLink(
+  List<MethodDayBlock> links,
+  List<MethodV2> methods,
+) {
+  final method =
+      methods.firstWhere(_isWalkAfterMealHabit, orElse: _walkAfterMealHabit);
+  final exists = links.any(
+    (link) =>
+        link.methodId == method.id && link.dayBlockKey == 'midday_reset',
+  );
+  if (exists) return links;
+  return [
+    ...links,
+    MethodDayBlock(
+      methodId: method.id,
+      dayBlockKey: 'midday_reset',
+      sortRank: 0,
+      isActive: true,
+      blockRole: 'optional',
+      defaultSelected: true,
+    ),
+  ];
+}
+
 class _HabitDefinition {
   const _HabitDefinition({
     required this.key,
@@ -58,6 +92,40 @@ class _HabitDefinition {
 
   final String key;
   final List<String> keywords;
+}
+
+bool _isWalkAfterMealHabit(MethodV2 method) {
+  final key = method.key.trim().toLowerCase();
+  final title = method.title.trim().toLowerCase();
+  return key == _middayDefaultHabitKey ||
+      title == _middayDefaultHabitTitle.toLowerCase();
+}
+
+MethodV2 _walkAfterMealHabit() {
+  return const MethodV2(
+    id: _middayDefaultHabitId,
+    key: _middayDefaultHabitKey,
+    pillarKey: 'recovery',
+    methodLevel: 'habit',
+    blockRole: 'optional',
+    defaultSelected: true,
+    habitKey: 'movement',
+    habitContent: '',
+    methodType: 'habit',
+    contentType: '',
+    category: 'Recovery',
+    title: _middayDefaultHabitTitle,
+    shortDesc: '10 Minuten nach dem Essen gehen.',
+    examples: [],
+    steps: [],
+    durationMinutes: 10,
+    benefit: 'Kurzer Reset nach dem Essen.',
+    pitfalls: [],
+    impactTags: [],
+    contexts: [],
+    isActive: true,
+    sortRank: 999,
+  );
 }
 
 bool isSystemLogicMethod(MethodV2 method) {

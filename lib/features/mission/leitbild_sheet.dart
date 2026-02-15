@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/catalog_item.dart';
 import '../../data/models/mission_template.dart';
 import '../../state/mission_state.dart';
+import '../../state/guest_mission_state.dart';
 import '../../state/user_selections_state.dart';
+import '../../state/user_state.dart';
 import '../../widgets/common/primary_button.dart';
 import '../../widgets/common/secondary_button.dart';
 
@@ -43,6 +46,7 @@ class _LeitbildSheetState extends ConsumerState<LeitbildSheet> {
     final personalityAsync = ref.watch(userSelectedPersonalityProvider);
     final templatesAsync = ref.watch(missionTemplatesProvider);
     final savedAsync = ref.watch(userMissionStatementProvider);
+    final user = ref.watch(userStateProvider);
 
     final asyncs = [
       valuesAsync,
@@ -74,30 +78,34 @@ class _LeitbildSheetState extends ConsumerState<LeitbildSheet> {
     final drivers = driversAsync.asData?.value ?? const <CatalogItem>[];
     final personality = personalityAsync.asData?.value ?? const <CatalogItem>[];
     final templates = templatesAsync.asData?.value ?? const <MissionTemplate>[];
+    final effectiveTemplates =
+        templates.isEmpty ? _localTemplates : templates;
     final saved = savedAsync.asData?.value;
 
-    _initSelectedTemplate(saved, templates);
+    _initSelectedTemplate(saved, effectiveTemplates);
 
     final valuesCount = values.length;
     final strengthsCount = strengths.length;
     final driversCount = drivers.length;
-    final personalityCount = personality.length;
+    final hasPersonality = user.personalityLevels.isNotEmpty;
+    final personalityCount = hasPersonality ? 1 : 0;
 
     final isEmpty = valuesCount == 0 &&
         strengthsCount == 0 &&
         driversCount == 0 &&
         personalityCount == 0;
-    final isComplete = valuesCount >= 3 &&
-        strengthsCount >= 3 &&
+    final isComplete = valuesCount >= 1 &&
+        strengthsCount >= 1 &&
         driversCount >= 1 &&
-        personalityCount >= 3;
+        personalityCount >= 1;
     final state = isEmpty
         ? _LeitbildState.empty
         : (isComplete ? _LeitbildState.complete : _LeitbildState.partial);
 
     final selectedTemplate =
-        templates.firstWhere((t) => t.id == _selectedTemplateId,
-            orElse: () => templates.isNotEmpty ? templates.first : _fallbackTemplate);
+        effectiveTemplates.firstWhere((t) => t.id == _selectedTemplateId,
+            orElse: () =>
+                effectiveTemplates.isNotEmpty ? effectiveTemplates.first : _fallbackTemplate);
     final previewText = _buildLeitbildText(
       template: selectedTemplate.template,
       values: values,
@@ -115,7 +123,7 @@ class _LeitbildSheetState extends ConsumerState<LeitbildSheet> {
             Text('Leitbild', style: theme.textTheme.headlineLarge),
             const SizedBox(height: 10),
             Text(
-              'Ein Satz, der dich ruhig state-based ausrichtet.',
+              'Ein kurzer Satz, der deinen Tag ausrichtet. Er wird automatisch aus deiner Innen-Auswahl erstellt.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacity(0.7),
               ),
@@ -137,7 +145,7 @@ class _LeitbildSheetState extends ConsumerState<LeitbildSheet> {
                 values: values,
                 strengths: strengths,
                 drivers: drivers,
-                templates: templates,
+                templates: effectiveTemplates,
                 selectedTemplateId: _selectedTemplateId,
                 onSelectTemplate: (id) => setState(() {
                   _selectedTemplateId = id;
@@ -178,6 +186,25 @@ class _LeitbildSheetState extends ConsumerState<LeitbildSheet> {
     required String templateId,
     required String statement,
   }) async {
+    final email = Supabase.instance.client.auth.currentUser?.email ?? '';
+    if (email.isEmpty) {
+      ref.read(guestMissionProvider.notifier).save(
+            statement: statement,
+            sourceTemplateId: templateId,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+              'Ohne Registrierung werden deine Daten nach dem Schließen der App gelöscht.'),
+          action: SnackBarAction(
+            label: 'Registrieren',
+            onPressed: () => context.push('/auth'),
+          ),
+        ),
+      );
+      return;
+    }
     final result = await ref.read(missionRepositoryProvider).upsertUserMission(
           userId: null,
           statement: statement,
@@ -210,13 +237,12 @@ class _EmptyStateCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Dein Leitbild entsteht aus deinen inneren Entscheidungen.',
+            'Dein Leitbild entsteht aus deinen Auswahlen.',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Sobald du Werte, Stärken, Antreiber und Persönlichkeit auswählst, '
-            'formt sich dein Leitbild automatisch.',
+            'Wähle zuerst Innen-Bausteine, dann bauen wir deinen Satz.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
@@ -257,11 +283,11 @@ class _PartialStateCard extends StatelessWidget {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
-          _ChecklistRow(label: 'Werte', value: '$valuesCount / 3'),
-          _ChecklistRow(label: 'Stärken', value: '$strengthsCount / 3'),
+          _ChecklistRow(label: 'Werte', value: '$valuesCount / 1'),
+          _ChecklistRow(label: 'Stärken', value: '$strengthsCount / 1'),
           _ChecklistRow(label: 'Antreiber', value: '$driversCount / 1'),
           _ChecklistRow(
-              label: 'Persönlichkeit', value: '$personalityCount / 3'),
+              label: 'Persönlichkeit', value: '$personalityCount / 1'),
           const SizedBox(height: 16),
           PrimaryButton(label: 'Innen vervollständigen', onPressed: onComplete),
           const SizedBox(height: 10),
@@ -324,7 +350,7 @@ class _CompleteState extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Basiert auf deinen Innen-Entscheidungen.',
+                'Basiert auf deinen Innen-Auswahlen.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.65),
                 ),
@@ -470,17 +496,20 @@ String _buildLeitbildText({
 
   String sentence;
   if (template.trim().isEmpty) {
-    sentence = 'Ich lebe $value1 und $value2 mit $strength, getragen von $driver.';
+    sentence =
+        'Ich richte mich an $value1 und $value2 aus, handle mit $strength, geprägt durch $personalityHint und getragen von $driver.';
   } else if (template.contains('{{')) {
     sentence = template
         .replaceAll('{{strength}}', strength)
         .replaceAll('{{value}}', value1)
         .replaceAll('{{value2}}', value2)
         .replaceAll('{{activity}}', personalityHint)
+        .replaceAll('{{personality}}', personalityHint)
         .replaceAll('{{target}}', value1)
         .replaceAll('{{impact}}', driver);
   } else {
-    sentence = '$template, getragen von $value1 und $strength.';
+    sentence =
+        '$template, ausgerichtet auf $value1, mit $strength und $personalityHint.';
   }
 
   sentence = sentence.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -490,15 +519,40 @@ String _buildLeitbildText({
   return sentence;
 }
 
-final _fallbackTemplate = MissionTemplate(
-  id: 'fallback',
-  key: 'ruhig',
-  template: 'Ich richte mich an {{value}} aus und handle mit {{strength}}.',
-  tone: 'Ruhig & stabil',
-  sortRank: 0,
-  isActive: true,
-  createdAt: DateTime(1970),
-);
+final _localTemplates = [
+  MissionTemplate(
+    id: 'local_ruhig',
+    key: 'ruhig',
+    template:
+        'Mit {{value}} und {{value2}} als Leitplanke handle ich mit {{strength}}, in der Art von {{personality}}, getragen von {{impact}}.',
+    tone: 'Ruhig & stabil',
+    sortRank: 0,
+    isActive: true,
+    createdAt: DateTime(1970),
+  ),
+  MissionTemplate(
+    id: 'local_fokus',
+    key: 'fokus',
+    template:
+        'Ich setze {{value}} und {{value2}} um, nutze {{strength}}, bleibe {{personality}} und werde von {{impact}} angetrieben.',
+    tone: 'Fokus & Umsetzung',
+    sortRank: 1,
+    isActive: true,
+    createdAt: DateTime(1970),
+  ),
+  MissionTemplate(
+    id: 'local_wachstum',
+    key: 'wachstum',
+    template:
+        'Ich lebe {{value}} und {{value2}}, handle mit {{strength}}, bin {{personality}} und lasse mich von {{impact}} tragen.',
+    tone: 'Wachstum & Klarheit',
+    sortRank: 2,
+    isActive: true,
+    createdAt: DateTime(1970),
+  ),
+];
+
+final _fallbackTemplate = _localTemplates.first;
 
 enum _LeitbildState { empty, partial, complete }
 

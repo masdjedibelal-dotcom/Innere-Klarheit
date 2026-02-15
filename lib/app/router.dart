@@ -8,6 +8,7 @@ import '../features/onboarding/onboarding_screen.dart';
 import '../features/profil/profil_screen.dart';
 import '../features/system/system_screen.dart';
 import '../features/snacks/snacks_list_screen.dart';
+import '../features/auth/auth_screen.dart';
 import 'shell_scaffold.dart';
 
 final appRouter = GoRouter(
@@ -42,8 +43,12 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: '/system',
-          pageBuilder: (context, state) =>
-              const NoTransitionPage(child: SystemScreen()),
+          pageBuilder: (context, state) => NoTransitionPage(
+            child: SystemScreen(
+              initialAction: state.uri.queryParameters['add'],
+              initialTitle: state.uri.queryParameters['title'],
+            ),
+          ),
         ),
       ],
     ),
@@ -52,8 +57,13 @@ final appRouter = GoRouter(
       builder: (context, state) => const ProfilScreen(),
     ),
     GoRoute(
+      path: '/auth',
+      builder: (context, state) => const AuthScreen(),
+    ),
+    GoRoute(
       path: '/snacks',
       builder: (context, state) => const SnacksListScreen(),
     ),
   ],
 );
+

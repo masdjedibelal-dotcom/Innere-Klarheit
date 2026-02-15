@@ -5,6 +5,7 @@ import '../../content/app_copy.dart';
 import '../../state/user_state.dart';
 import '../../widgets/common/secondary_button.dart';
 import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/knowledge_snack_sheet.dart';
 
 class WissenDetailScreen extends ConsumerWidget {
   const WissenDetailScreen({super.key, required this.snackId});
@@ -112,16 +113,26 @@ class WissenDetailScreen extends ConsumerWidget {
           ),
           child: Row(
             children: [
+              PrimaryButton(
+                label: 'In Tagesplan',
+                onPressed: () {
+                  final snack = knowledgeAsync.asData?.value
+                      .firstWhere((e) => e.id == snackId);
+                  if (snack == null) return;
+                  showKnowledgeSnackActionSheet(
+                    context: context,
+                    snack: snack,
+                  );
+                },
+              ),
+              const Spacer(),
               SecondaryButton(
-                label: ctaCopy.ctaPrimary.isNotEmpty ? ctaCopy.ctaPrimary : 'Speichern',
+                label: ctaCopy.ctaPrimary.isNotEmpty
+                    ? ctaCopy.ctaPrimary
+                    : 'Speichern',
                 onPressed: () => ref
                     .read(userStateProvider.notifier)
                     .toggleSnackSaved(snackId),
-              ),
-              const Spacer(),
-              PrimaryButton(
-                label: 'Weiter',
-                onPressed: () {},
               ),
             ],
           ),

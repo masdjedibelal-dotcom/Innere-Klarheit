@@ -30,7 +30,7 @@ ThemeData buildAppTheme() {
 
   return base.copyWith(
     scaffoldBackgroundColor: bg,
-    dividerColor: outline,
+    dividerColor: Colors.transparent,
     textTheme: base.textTheme.copyWith(
       headlineLarge: base.textTheme.headlineLarge?.copyWith(
         fontSize: 34,
@@ -179,7 +179,7 @@ ThemeData buildAppTheme() {
         borderRadius: BorderRadius.circular(radiusMd),
       ),
       focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(color: primary),
+        borderSide: const BorderSide(color: Colors.transparent),
         borderRadius: BorderRadius.circular(radiusMd),
       ),
     ),

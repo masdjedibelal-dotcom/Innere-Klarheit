@@ -3,6 +3,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 bool _loggedOutNoted = false;
 
+bool isEmailUser(SupabaseClient client) {
+  final email = client.auth.currentUser?.email ?? '';
+  return email.isNotEmpty;
+}
+
 String? requireUser(SupabaseClient client, {bool logOnce = true}) {
   final uid = client.auth.currentUser?.id;
   if (uid != null) return uid;

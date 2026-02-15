@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../state/snacks_state.dart';
+import '../../state/user_state.dart';
 import '../../widgets/common/tag_chip.dart';
 
 class SnackDetailScreen extends ConsumerWidget {
@@ -75,7 +77,7 @@ class SnackDetailScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+        border: const Border(top: BorderSide(color: Colors.transparent)),
           ),
           child: savedAsync.when(
             data: (ids) {
@@ -100,8 +102,21 @@ class SnackDetailScreen extends ConsumerWidget {
 
   Future<void> _toggleSave(
       BuildContext context, WidgetRef ref, bool isSaved) async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) {
+    final email = Supabase.instance.client.auth.currentUser?.email ?? '';
+    if (email.isEmpty) {
+      ref.read(userStateProvider.notifier).toggleSnackSaved(snackId);
+      ref.invalidate(savedSnackIdsProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+              'Ohne Registrierung werden deine Daten nach dem Schließen der App gelöscht.'),
+          action: SnackBarAction(
+            label: 'Registrieren',
+            onPressed: () => context.push('/auth'),
+          ),
+        ),
+      );
       return;
     }
 
