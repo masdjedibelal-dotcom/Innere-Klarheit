@@ -11,6 +11,7 @@ import '../../widgets/common/section_header.dart';
 import '../../widgets/common/carousel_tile.dart';
 import '../../widgets/bottom_sheet/bottom_card_sheet.dart';
 import '../../widgets/common/knowledge_snack_sheet.dart';
+import '../../widgets/common/generated_media.dart';
 import '../../widgets/bottom_sheet/habit_sheet.dart';
 import '../../widgets/common/tag_chip.dart';
 import '../../state/user_state.dart';
@@ -408,6 +409,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       preview: snack.preview,
                       badgeText:
                           snack.tags.isNotEmpty ? snack.tags.first : 'Wissenssnack',
+                      tags: snack.tags,
                       onTap: () => showKnowledgeSnackSheet(
                         context: context,
                         snack: snack,
@@ -653,12 +655,14 @@ class _KnowledgeTile extends StatelessWidget {
     required this.title,
     required this.preview,
     required this.badgeText,
+    required this.tags,
     this.onTap,
   });
 
   final String title;
   final String preview;
   final String badgeText;
+  final List<String> tags;
   final VoidCallback? onTap;
 
   @override
@@ -685,6 +689,14 @@ class _KnowledgeTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            GeneratedMedia(
+              seed: title,
+              height: 78,
+              borderRadius: 14,
+              tags: tags,
+              title: title,
+            ),
+            const SizedBox(height: 6),
             TagChip(label: badgeText),
             const SizedBox(height: 4),
             Text(

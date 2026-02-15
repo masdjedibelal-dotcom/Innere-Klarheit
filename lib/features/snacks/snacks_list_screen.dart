@@ -99,7 +99,8 @@ class _SnacksListScreenState extends ConsumerState<SnacksListScreen> {
                               seed: snack.id,
                               height: 120,
                               borderRadius: 16,
-                              icon: Icons.chrome_reader_mode_outlined,
+                              tags: snack.tags,
+                              title: snack.title,
                             ),
                             const SizedBox(height: 12),
                             Text(
