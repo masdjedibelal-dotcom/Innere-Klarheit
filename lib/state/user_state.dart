@@ -57,6 +57,7 @@ class UserState {
   final Map<String, Map<String, DayPlanBlock>> dayPlansByDate;
   final Map<String, List<String>> dayBlockOrderByDate;
   final Map<String, double> pillarScores;
+  final Map<String, int> personalityLevels;
   final Set<String> loginDates;
   final Map<String, String> dayCloseoutAnswers;
   final String dayCloseoutNote;
@@ -76,6 +77,7 @@ class UserState {
     required this.dayPlansByDate,
     required this.dayBlockOrderByDate,
     required this.pillarScores,
+    required this.personalityLevels,
     required this.loginDates,
     required this.dayCloseoutAnswers,
     required this.dayCloseoutNote,
@@ -96,6 +98,7 @@ class UserState {
     Map<String, Map<String, DayPlanBlock>>? dayPlansByDate,
     Map<String, List<String>>? dayBlockOrderByDate,
     Map<String, double>? pillarScores,
+    Map<String, int>? personalityLevels,
     Set<String>? loginDates,
     Map<String, String>? dayCloseoutAnswers,
     String? dayCloseoutNote,
@@ -117,6 +120,7 @@ class UserState {
       dayPlansByDate: dayPlansByDate ?? this.dayPlansByDate,
       dayBlockOrderByDate: dayBlockOrderByDate ?? this.dayBlockOrderByDate,
       pillarScores: pillarScores ?? this.pillarScores,
+      personalityLevels: personalityLevels ?? this.personalityLevels,
       loginDates: loginDates ?? this.loginDates,
       dayCloseoutAnswers: dayCloseoutAnswers ?? this.dayCloseoutAnswers,
       dayCloseoutNote: dayCloseoutNote ?? this.dayCloseoutNote,
@@ -145,10 +149,11 @@ class UserStateNotifier extends StateNotifier<UserState> {
           dayPlansByDate: {},
           dayBlockOrderByDate: {},
           pillarScores: {},
+      personalityLevels: {},
           loginDates: {},
           dayCloseoutAnswers: {},
           dayCloseoutNote: '',
-          isLoggedIn: true,
+          isLoggedIn: false,
           profileName: '',
           lastActiveAt: null,
           remindersEnabled: false,
@@ -201,6 +206,12 @@ class UserStateNotifier extends StateNotifier<UserState> {
       list.add(sentence);
     }
     state = state.copyWith(favoriteIdentitySentences: list);
+  }
+
+  void setPersonalityLevel(String id, int level) {
+    final next = Map<String, int>.from(state.personalityLevels);
+    next[id] = level.clamp(0, 2);
+    state = state.copyWith(personalityLevels: next);
   }
 
   void setDayPlanBlock(DayPlanBlock block) {
@@ -351,6 +362,7 @@ class UserStateNotifier extends StateNotifier<UserState> {
   }
 
   void _syncDailyUsage() {
+    if (!_hasEmailLogin()) return;
     final blocksCount = state.todayPlan.length;
     final methodsCount = state.todayPlan.values
         .map((b) => b.methodIds.length)
@@ -363,6 +375,11 @@ class UserStateNotifier extends StateNotifier<UserState> {
         methodsCount: methodsCount,
       );
     }();
+  }
+
+  bool _hasEmailLogin() {
+    final email = _ref.read(supabaseClientProvider).auth.currentUser?.email ?? '';
+    return email.isNotEmpty;
   }
 }
 

@@ -8,6 +8,8 @@ import '../data/repositories/inner_repository.dart';
 import '../data/repositories/mission_repository.dart';
 import '../data/repositories/user_selections_repository.dart';
 import '../data/supabase/supabase_client_provider.dart';
+import 'guest_mission_state.dart';
+import 'guest_selections_state.dart';
 
 final missionRepositoryProvider = Provider<MissionRepository>((ref) =>
     MissionRepository(client: ref.read(supabaseClientProvider)));
@@ -30,6 +32,11 @@ final missionTemplatesProvider = FutureProvider<List<MissionTemplate>>((ref) {
 
 final userMissionStatementProvider =
     FutureProvider<UserMissionStatement?>((ref) {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return Future.value(ref.watch(guestMissionProvider).statement);
+  }
   return ref
       .read(missionRepositoryProvider)
       .getUserMission(userId: null)
@@ -37,6 +44,11 @@ final userMissionStatementProvider =
 });
 
 final userStrengthsProvider = FutureProvider<List<CatalogItem>>((ref) {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return Future.value(ref.watch(guestSelectionsProvider).strengths);
+  }
   return ref
       .read(userSelectionsRepositoryProvider)
       .fetchUserSelectedStrengths()
@@ -44,6 +56,11 @@ final userStrengthsProvider = FutureProvider<List<CatalogItem>>((ref) {
 });
 
 final userValuesProvider = FutureProvider<List<CatalogItem>>((ref) {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return Future.value(ref.watch(guestSelectionsProvider).values);
+  }
   return ref
       .read(userSelectionsRepositoryProvider)
       .fetchUserSelectedValues()

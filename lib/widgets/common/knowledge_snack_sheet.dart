@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../data/models/knowledge_snack.dart';
 import '../../state/user_state.dart';
 import '../bottom_sheet/bottom_card_sheet.dart';
-import 'primary_button.dart';
 import 'tag_chip.dart';
 
 Future<void> showKnowledgeSnackSheet({
@@ -15,6 +15,19 @@ Future<void> showKnowledgeSnackSheet({
     context: context,
     maxHeightFactor: 0.95,
     child: KnowledgeSnackSheet(snack: snack),
+  );
+}
+
+Future<void> showKnowledgeSnackActionSheet({
+  required BuildContext context,
+  required KnowledgeSnack snack,
+}) {
+  return showBottomCardSheet(
+    context: context,
+    child: _SnackActionSheet(
+      snack: snack,
+      rootContext: context,
+    ),
   );
 }
 
@@ -82,11 +95,22 @@ class KnowledgeSnackSheet extends ConsumerWidget {
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
-            child: PrimaryButton(
-              label: 'Speichern',
+            child: FilledButton(
+              onPressed: () => showKnowledgeSnackActionSheet(
+                context: context,
+                snack: snack,
+              ),
+              child: const Text('In Tagesplan übernehmen'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
               onPressed: () => ref
                   .read(userStateProvider.notifier)
                   .toggleSnackSaved(snack.id),
+              child: const Text('Speichern'),
             ),
           ),
           const SizedBox(height: 8),
@@ -95,6 +119,84 @@ class KnowledgeSnackSheet extends ConsumerWidget {
     );
   }
 }
+
+class _SnackActionSheet extends StatelessWidget {
+  const _SnackActionSheet({
+    required this.snack,
+    required this.rootContext,
+  });
+
+  final KnowledgeSnack snack;
+  final BuildContext rootContext;
+
+  void _handleAction(BuildContext context, _SnackAction action) {
+    Navigator.of(context).pop();
+    final encodedTitle = Uri.encodeComponent(snack.title);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      switch (action) {
+        case _SnackAction.todo:
+          rootContext.push('/system?add=todo&title=$encodedTitle');
+          break;
+        case _SnackAction.appointment:
+          rootContext.push('/system?add=appointment&title=$encodedTitle');
+          break;
+        case _SnackAction.habit:
+          rootContext.push('/system?add=habit&title=$encodedTitle');
+          break;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Übernehmen als …',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Wähle, wie du diesen Snack in deinen Tag überführen willst.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withOpacity(0.7),
+              ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: () => _handleAction(context, _SnackAction.todo),
+            child: const Text('To-Do'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => _handleAction(context, _SnackAction.appointment),
+            child: const Text('Termin'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => _handleAction(context, _SnackAction.habit),
+            child: const Text('Habit'),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+enum _SnackAction { todo, appointment, habit }
 
 List<String> _paragraphs(String text) {
   return text

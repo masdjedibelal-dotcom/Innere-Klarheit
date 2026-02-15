@@ -5,6 +5,7 @@ import '../data/models/inner_catalog_detail.dart';
 import '../data/repositories/inner_repository.dart';
 import '../data/repositories/user_selections_repository.dart';
 import '../data/supabase/supabase_client_provider.dart';
+import 'guest_selections_state.dart';
 
 final innerCatalogRepositoryProvider = Provider<InnerRepository>(
     (ref) => InnerRepository(client: ref.read(supabaseClientProvider)));
@@ -43,6 +44,11 @@ final innerPersonalityDetailProvider =
 
 final userSelectedStrengthsProvider =
     FutureProvider<List<CatalogItem>>((ref) async {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return ref.watch(guestSelectionsProvider).strengths;
+  }
   final result = await ref
       .read(innerSelectionsRepositoryProvider)
       .fetchUserSelectedStrengths();
@@ -51,6 +57,11 @@ final userSelectedStrengthsProvider =
 
 final userSelectedValuesProvider =
     FutureProvider<List<CatalogItem>>((ref) async {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return ref.watch(guestSelectionsProvider).values;
+  }
   final result = await ref
       .read(innerSelectionsRepositoryProvider)
       .fetchUserSelectedValues();
@@ -59,6 +70,11 @@ final userSelectedValuesProvider =
 
 final userSelectedDriversProvider =
     FutureProvider<List<CatalogItem>>((ref) async {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return ref.watch(guestSelectionsProvider).drivers;
+  }
   final result = await ref
       .read(innerSelectionsRepositoryProvider)
       .fetchUserSelectedDrivers();
@@ -67,6 +83,11 @@ final userSelectedDriversProvider =
 
 final userSelectedPersonalityProvider =
     FutureProvider<List<CatalogItem>>((ref) async {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return ref.watch(guestSelectionsProvider).personality;
+  }
   final result = await ref
       .read(innerSelectionsRepositoryProvider)
       .fetchUserSelectedPersonality();

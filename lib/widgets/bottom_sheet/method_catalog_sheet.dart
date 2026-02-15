@@ -154,9 +154,11 @@ class _MethodCatalogSheetState extends ConsumerState<MethodCatalogSheet> {
         Text(widget.block.title, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
         TextField(
-          decoration: const InputDecoration(
+        decoration: const InputDecoration(
             hintText: 'Methoden filtern …',
-            border: OutlineInputBorder(),
+          border: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.transparent),
+          ),
           ),
           onChanged: (v) => setState(() => query = v),
         ),

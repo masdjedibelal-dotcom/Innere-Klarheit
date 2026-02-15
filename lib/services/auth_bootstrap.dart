@@ -10,10 +10,9 @@ class AuthBootstrap {
   Future<void> ensureAnonymousSession() async {
     final session = _client.auth.currentSession;
     if (session == null) {
-      await _client.auth.signInAnonymously();
+      return;
     }
     final profileRepo = UserProfileRepository(client: _client);
-    await profileRepo.getOrCreate();
     await profileRepo.touchLastActive();
   }
 }

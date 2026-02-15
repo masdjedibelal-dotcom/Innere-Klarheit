@@ -6,6 +6,7 @@ import '../data/models/user_identity_sentence.dart';
 import '../data/repositories/user_identity_repository.dart';
 import '../data/repositories/user_selections_repository.dart';
 import '../data/supabase/supabase_client_provider.dart';
+import 'guest_selections_state.dart';
 
 final userSelectionsRepoProvider = Provider<UserSelectionsRepository>(
     (ref) => UserSelectionsRepository(client: ref.read(supabaseClientProvider)));
@@ -14,6 +15,11 @@ final userIdentityRepoProvider = Provider<UserIdentityRepository>(
     (ref) => UserIdentityRepository(client: ref.read(supabaseClientProvider)));
 
 final userSelectedValuesProvider = FutureProvider<List<CatalogItem>>((ref) {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return Future.value(ref.watch(guestSelectionsProvider).values);
+  }
   return ref
       .read(userSelectionsRepoProvider)
       .fetchUserSelectedValues()
@@ -21,6 +27,11 @@ final userSelectedValuesProvider = FutureProvider<List<CatalogItem>>((ref) {
 });
 
 final userSelectedStrengthsProvider = FutureProvider<List<CatalogItem>>((ref) {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return Future.value(ref.watch(guestSelectionsProvider).strengths);
+  }
   return ref
       .read(userSelectionsRepoProvider)
       .fetchUserSelectedStrengths()
@@ -28,6 +39,11 @@ final userSelectedStrengthsProvider = FutureProvider<List<CatalogItem>>((ref) {
 });
 
 final userSelectedDriversProvider = FutureProvider<List<CatalogItem>>((ref) {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return Future.value(ref.watch(guestSelectionsProvider).drivers);
+  }
   return ref
       .read(userSelectionsRepoProvider)
       .fetchUserSelectedDrivers()
@@ -35,6 +51,11 @@ final userSelectedDriversProvider = FutureProvider<List<CatalogItem>>((ref) {
 });
 
 final userSelectedPersonalityProvider = FutureProvider<List<CatalogItem>>((ref) {
+  final client = ref.read(supabaseClientProvider);
+  final email = client.auth.currentUser?.email ?? '';
+  if (email.isEmpty) {
+    return Future.value(ref.watch(guestSelectionsProvider).personality);
+  }
   return ref
       .read(userSelectionsRepoProvider)
       .fetchUserSelectedPersonality()
